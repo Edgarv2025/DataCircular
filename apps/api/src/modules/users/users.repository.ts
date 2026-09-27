@@ -1,6 +1,12 @@
 import { prisma } from '../../database/prisma';
 import { User, UserRole, UserStatus } from '../../generated/prisma-client';
-import { SafeUserDto, CreateUserInput, UpdateUserInput } from '@data-circular/shared';
+import {
+  SafeUserDto,
+  PublicUserDto,
+  CreateUserInput,
+  UpdateUserInput,
+  AdminUpdateUserInput,
+} from '@data-circular/shared';
 
 /**
  * Normaliza una dirección de correo electrónico:
@@ -25,6 +31,19 @@ export function toSafeUser(user: User): SafeUserDto {
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
     deletedAt: user.deletedAt ? user.deletedAt.toISOString() : null,
+  };
+}
+
+/**
+ * Mapea una entidad a un DTO público (PublicUserDto).
+ * Omite deliberadamente email, teléfono, status privado y metadatos sensibles.
+ */
+export function toPublicUser(user: User | SafeUserDto): PublicUserDto {
+  return {
+    id: user.id,
+    fullName: user.fullName,
+    role: user.role as PublicUserDto['role'],
+    createdAt: typeof user.createdAt === 'string' ? user.createdAt : user.createdAt.toISOString(),
   };
 }
 
@@ -90,7 +109,7 @@ export class UsersRepository {
   }
 
   /**
-   * Actualiza los datos permitidos del perfil de usuario.
+   * Actualiza los datos permitidos del perfil propio (solo fullName y phone).
    */
   async update(id: string, input: UpdateUserInput): Promise<SafeUserDto> {
     const user = await prisma.user.update({
@@ -98,6 +117,23 @@ export class UsersRepository {
       data: {
         ...(input.fullName ? { fullName: input.fullName.trim() } : {}),
         ...(input.phone !== undefined ? { phone: input.phone ? input.phone.trim() : null } : {}),
+      },
+    });
+
+    return toSafeUser(user);
+  }
+
+  /**
+   * Actualización administrativa: permite a usuarios con rol ADMIN modificar status y role.
+   */
+  async adminUpdate(id: string, input: AdminUpdateUserInput): Promise<SafeUserDto> {
+    const user = await prisma.user.update({
+      where: { id },
+      data: {
+        ...(input.fullName ? { fullName: input.fullName.trim() } : {}),
+        ...(input.phone !== undefined ? { phone: input.phone ? input.phone.trim() : null } : {}),
+        ...(input.status ? { status: input.status as UserStatus } : {}),
+        ...(input.role ? { role: input.role as UserRole } : {}),
       },
     });
 

@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { verifyAccessToken } from '../utils/jwt';
 import { usersRepository } from '../modules/users/users.repository';
 import { sendError } from '../utils/apiResponse';
-import { SafeUserDto } from '@data-circular/shared';
+import { SafeUserDto, UserRole } from '@data-circular/shared';
 
 // Extender la interfaz Request de Express para incluir el usuario autenticado
 declare global {
@@ -62,4 +62,30 @@ export async function authenticateToken(
     const errorMessage = err instanceof Error ? err.message : 'Token inválido';
     sendError(res, 'UNAUTHORIZED', `Token inválido o expirado: ${errorMessage}`, 401);
   }
+}
+
+/**
+ * Middleware de autorización por rol.
+ * Comprueba que el usuario autenticado posea alguno de los roles requeridos.
+ */
+export function requireRole(allowedRoles: UserRole | UserRole[]) {
+  const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
+  return (req: Request, res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      sendError(res, 'UNAUTHORIZED', 'No autenticado', 401);
+      return;
+    }
+
+    if (!roles.includes(req.user.role)) {
+      sendError(
+        res,
+        'FORBIDDEN',
+        'No tienes permisos suficientes para realizar esta acción administrativa',
+        403
+      );
+      return;
+    }
+
+    next();
+  };
 }

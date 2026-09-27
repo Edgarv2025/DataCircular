@@ -11,9 +11,7 @@
 
 ### `GET /api/v1/health`
 Verifica la disponibilidad del servidor y comprueba la conectividad activa con PostgreSQL.
-
-#### Headers
-No requiere autenticación.
+- **Acceso**: Público.
 
 #### Respuesta Exitosa (200 OK)
 ```json
@@ -42,7 +40,7 @@ No requiere autenticación.
 ### `POST /api/v1/auth/register`
 Registra un nuevo usuario en la plataforma.
 - **Acceso**: Público.
-- **Seguridad**: Rate limit (máximo 20 peticiones/hora). Inmune a escalada de privilegios (el rol siempre se asigna como `USER`).
+- **Seguridad**: Rate limit (máx. 20 peticiones/hora). Inmune a escalada de privilegios (el rol siempre se asigna como `USER`).
 
 #### Body de la Petición
 ```json
@@ -53,12 +51,6 @@ Registra un nuevo usuario en la plataforma.
   "phone": "+57 300 123 4567"
 }
 ```
-
-#### Reglas de Validación
-- `fullName`: String (3 a 150 caracteres).
-- `email`: Formato email válido. Se normaliza a minúsculas automáticamente.
-- `password`: Mínimo 8 caracteres, al menos 1 letra mayúscula, 1 minúscula, 1 número y 1 carácter especial.
-- `phone`: Opcional (hasta 30 caracteres).
 
 #### Respuesta Exitosa (201 Created)
 ```json
@@ -87,57 +79,12 @@ Registra un nuevo usuario en la plataforma.
 }
 ```
 
-#### Errores Posibles
-- `400 BAD_REQUEST`: Datos faltantes o contraseña débil (`VALIDATION_ERROR`).
-- `409 CONFLICT`: Correo ya registrado (`EMAIL_ALREADY_REGISTERED`).
-- `429 TOO_MANY_REQUESTS`: Exceso de intentos de registro.
-
 ---
 
 ### `POST /api/v1/auth/login`
 Inicia sesión validando credenciales de usuario.
 - **Acceso**: Público.
-- **Seguridad**: Rate limit (máximo 10 intentos/15 min). Respuestas genéricas para mitigar ataques de enumeración de usuarios.
-
-#### Body de la Petición
-```json
-{
-  "email": "carlos.mendoza@fundacionimara.org",
-  "password": "Password123!@#"
-}
-```
-
-#### Respuesta Exitosa (200 OK)
-```json
-{
-  "success": true,
-  "message": "Inicio de sesión exitoso",
-  "data": {
-    "user": {
-      "id": "550e8400-e29b-41d4-a716-446655440000",
-      "fullName": "Carlos Mendoza",
-      "email": "carlos.mendoza@fundacionimara.org",
-      "phone": "+57 300 123 4567",
-      "status": "ACTIVE",
-      "role": "USER",
-      "createdAt": "2026-09-27T18:05:00.000Z",
-      "updatedAt": "2026-09-27T18:05:00.000Z",
-      "deletedAt": null
-    },
-    "tokens": {
-      "accessToken": "eyJhbGciOi...",
-      "refreshToken": "eyJhbGciOi...",
-      "expiresIn": "7d"
-    }
-  },
-  "timestamp": "2026-09-27T18:10:00.000Z"
-}
-```
-
-#### Errores Posibles
-- `401 UNAUTHORIZED`: Credenciales inválidas (`INVALID_CREDENTIALS`).
-- `403 FORBIDDEN`: Cuenta no activa o suspendida (`ACCOUNT_NOT_ACTIVE`).
-- `429 TOO_MANY_REQUESTS`: Límite de intentos superado.
+- **Seguridad**: Rate limit (máx. 10 intentos/15 min). Mensajes genéricos anti-enumeración de usuarios.
 
 ---
 
@@ -145,54 +92,112 @@ Inicia sesión validando credenciales de usuario.
 Cierra la sesión del usuario autenticado.
 - **Acceso**: Privado (Requiere `Authorization: Bearer <accessToken>`).
 
-#### Respuesta Exitosa (200 OK)
-```json
-{
-  "success": true,
-  "message": "Sesión cerrada exitosamente",
-  "data": null,
-  "timestamp": "2026-09-27T18:15:00.000Z"
-}
-```
-
-#### Errores Posibles
-- `401 UNAUTHORIZED`: Token ausente, inválido o expirado.
-
 ---
 
 ### `POST /api/v1/auth/refresh`
 Renueva el Access Token utilizando un Refresh Token válido.
 - **Acceso**: Público.
 
-#### Body de la Petición
-```json
-{
-  "refreshToken": "eyJhbGciOi..."
-}
-```
+---
+
+## 3. Módulo de Usuarios y Perfil (`/api/v1/users`)
+
+### `GET /api/v1/users/me`
+Consulta el perfil completo seguro del usuario actualmente autenticado.
+- **Acceso**: Privado (`Authorization: Bearer <accessToken>`).
 
 #### Respuesta Exitosa (200 OK)
 ```json
 {
   "success": true,
-  "message": "Tokens renovados exitosamente",
+  "message": "Perfil de usuario obtenido exitosamente",
   "data": {
-    "tokens": {
-      "accessToken": "eyJhbGciOi...",
-      "refreshToken": "eyJhbGciOi...",
-      "expiresIn": "7d"
-    }
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "fullName": "Carlos Mendoza",
+    "email": "carlos.mendoza@fundacionimara.org",
+    "phone": "+57 300 123 4567",
+    "status": "ACTIVE",
+    "role": "USER",
+    "createdAt": "2026-09-27T18:05:00.000Z",
+    "updatedAt": "2026-09-27T18:05:00.000Z",
+    "deletedAt": null
   },
-  "timestamp": "2026-09-27T18:20:00.000Z"
+  "timestamp": "2026-09-27T19:00:00.000Z"
 }
 ```
 
-#### Errores Posibles
-- `401 UNAUTHORIZED`: Refresh Token inválido, expirado o manipulado (`INVALID_REFRESH_TOKEN`).
+---
+
+### `PATCH /api/v1/users/me`
+Actualiza datos permitidos del perfil propio (únicamente `fullName` y `phone`).
+- **Acceso**: Privado (`Authorization: Bearer <accessToken>`).
+- **Seguridad**: Cualquier intento de enviar `email`, `role`, `status` o `passwordHash` es descartado.
+
+#### Body de la Petición
+```json
+{
+  "fullName": "Carlos Mendoza Actualizado",
+  "phone": "+57 311 999 8888"
+}
+```
+
+#### Respuesta Exitosa (200 OK)
+Retorna el objeto `SafeUserDto` con los datos actualizados y la nueva fecha `updatedAt`.
 
 ---
 
-## 3. Formato Estándar de Errores
+### `DELETE /api/v1/users/me`
+Desactiva lógicamente la cuenta del usuario autenticado (`Soft Delete`).
+- **Acceso**: Privado (`Authorization: Bearer <accessToken>`).
+- **Efectos**: Asigna la marca temporal en `deletedAt` y cambia el estado a `INACTIVE`. La sesión activa queda invalidada de inmediato y no se permitirá iniciar nuevas sesiones.
+
+#### Respuesta Exitosa (200 OK)
+```json
+{
+  "success": true,
+  "message": "Cuenta desactivada exitosamente. Tu sesión ya no será válida.",
+  "data": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "status": "INACTIVE",
+    "deletedAt": "2026-09-27T19:30:00.000Z"
+  },
+  "timestamp": "2026-09-27T19:30:00.000Z"
+}
+```
+
+---
+
+### `GET /api/v1/users/:id`
+Consulta el perfil público de otro usuario en el marketplace.
+- **Acceso**: Privado (`Authorization: Bearer <accessToken>`).
+- **Privacidad**: Omite deliberadamente `email`, `phone`, `passwordHash` y estado interno.
+
+#### Respuesta Exitosa (200 OK)
+```json
+{
+  "success": true,
+  "message": "Perfil público de usuario obtenido exitosamente",
+  "data": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "fullName": "Carlos Mendoza",
+    "role": "USER",
+    "createdAt": "2026-09-27T18:05:00.000Z"
+  },
+  "timestamp": "2026-09-27T19:35:00.000Z"
+}
+```
+
+---
+
+### `PATCH /api/v1/users/:id`
+Modifica campos de un usuario por parte de un Administrador.
+- **Acceso**: Exclusivo para administradores (`Authorization: Bearer <token>` con rol `ADMIN`).
+- **Permite modificar**: `fullName`, `phone`, `status` (`ACTIVE`, `INACTIVE`, `SUSPENDED`) y `role` (`USER`, `ADMIN`).
+- **Respuesta de rechazo para usuarios no administradores**: `403 FORBIDDEN`.
+
+---
+
+## 4. Formato Estándar de Errores
 ```json
 {
   "success": false,

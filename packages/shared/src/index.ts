@@ -30,15 +30,15 @@ export interface HealthCheckData {
 }
 
 // ==========================================
-// Tipos de Dominio de Usuario (Fase 2)
+// Tipos de Dominio de Usuario (Fase 2 y 4)
 // ==========================================
 
 export type UserStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
 export type UserRole = 'USER' | 'ADMIN';
 
 /**
- * Representación segura de usuario para consumo público / frontend.
- * NUNCA incluye passwordHash ni información de seguridad sensible.
+ * Representación segura de usuario para consumo autenticado (perfil propio).
+ * NUNCA incluye passwordHash.
  */
 export interface SafeUserDto {
   id: string;
@@ -52,6 +52,17 @@ export interface SafeUserDto {
   deletedAt: string | null;
 }
 
+/**
+ * Representación pública de un usuario (para otros usuarios del marketplace).
+ * Omite deliberadamente email, teléfono, status privado y metadatos sensibles.
+ */
+export interface PublicUserDto {
+  id: string;
+  fullName: string;
+  role: UserRole;
+  createdAt: string;
+}
+
 export interface CreateUserInput {
   fullName: string;
   email: string;
@@ -63,6 +74,13 @@ export interface CreateUserInput {
 export interface UpdateUserInput {
   fullName?: string;
   phone?: string | null;
+}
+
+export interface AdminUpdateUserInput {
+  fullName?: string;
+  phone?: string | null;
+  status?: UserStatus;
+  role?: UserRole;
 }
 
 // ==========================================
@@ -136,3 +154,47 @@ export interface AuthResponseDto {
   user: SafeUserDto;
   tokens: AuthTokens;
 }
+
+// ==========================================
+// Esquemas de Validación (Fase 4: CRUD Usuarios)
+// ==========================================
+
+export const updateProfileSchema = z.object({
+  fullName: z
+    .string()
+    .trim()
+    .min(3, 'El nombre debe tener al menos 3 caracteres')
+    .max(150, 'El nombre no puede exceder 150 caracteres')
+    .optional(),
+  phone: z
+    .string()
+    .trim()
+    .max(30, 'El teléfono no puede exceder 30 caracteres')
+    .optional()
+    .nullable(),
+});
+
+export type UpdateProfileDto = z.infer<typeof updateProfileSchema>;
+
+export const adminUpdateUserSchema = z.object({
+  fullName: z
+    .string()
+    .trim()
+    .min(3)
+    .max(150)
+    .optional(),
+  phone: z
+    .string()
+    .trim()
+    .max(30)
+    .optional()
+    .nullable(),
+  status: z
+    .enum(['ACTIVE', 'INACTIVE', 'SUSPENDED'] as const)
+    .optional(),
+  role: z
+    .enum(['USER', 'ADMIN'] as const)
+    .optional(),
+});
+
+export type AdminUpdateUserDto = z.infer<typeof adminUpdateUserSchema>;
