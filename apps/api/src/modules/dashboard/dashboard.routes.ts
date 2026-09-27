@@ -1,234 +1,408 @@
 import { Router, Request, Response } from 'express';
+import { BOGOTA_LOCALITIES } from '@data-circular/shared';
 
 const router = Router();
 
 router.get('/', (_req: Request, res: Response) => {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
+
+  const localitiesOptions = BOGOTA_LOCALITIES.map((loc) => `<option value="${loc}">${loc}</option>`).join('');
+
   res.send(`<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DATA_CIRCULAR - Consola Interactiva de Desarrollo</title>
+  <title>DATA_CIRCULAR - Consola de Verificación en Vivo (Bogotá, Colombia)</title>
   <style>
     :root {
       --primary: #1B4332;
       --primary-light: #2D6A4F;
       --accent: #52B788;
-      --bg: #F8F9FA;
+      --accent-light: #D8F3DC;
+      --bg: #F0F4F1;
       --card-bg: #FFFFFF;
-      --text: #212529;
-      --muted: #6C757D;
+      --text: #1B262C;
+      --muted: #52616B;
       --danger: #E63946;
       --success: #2A9D8F;
-      --border: #DEE2E6;
+      --border: #D1D9D4;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); padding: 24px; line-height: 1.5; }
-    .container { max-width: 1000px; margin: 0 auto; }
-    header { background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: white; padding: 28px; border-radius: 12px; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-    h1 { font-size: 24px; font-weight: 700; margin-bottom: 6px; }
-    p.subtitle { opacity: 0.9; font-size: 14px; }
-    .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; margin-top: 10px; background: var(--accent); color: var(--primary); }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 20px; }
-    .card { background: var(--card-bg); border-radius: 10px; padding: 20px; border: 1px solid var(--border); box-shadow: 0 2px 6px rgba(0,0,0,0.04); }
-    .card h2 { font-size: 16px; font-weight: 600; color: var(--primary); margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
-    .badge-method { background: #E9ECEF; color: #495057; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-family: monospace; }
-    .form-group { margin-bottom: 12px; }
-    label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 4px; color: var(--muted); }
-    input { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; outline: none; transition: border-color 0.2s; }
-    input:focus { border-color: var(--accent); ring: 2px solid rgba(82, 183, 136, 0.2); }
-    button { background: var(--primary); color: white; border: none; padding: 10px 16px; border-radius: 6px; font-weight: 600; font-size: 13px; cursor: pointer; transition: background 0.2s; width: 100%; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); padding: 20px; line-height: 1.5; }
+    .container { max-width: 1100px; margin: 0 auto; }
+    header { background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: white; padding: 24px 28px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(27,67,50,0.2); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
+    .header-text h1 { font-size: 22px; font-weight: 700; }
+    .header-text p { opacity: 0.9; font-size: 13px; margin-top: 3px; }
+    .status-pill { background: var(--accent); color: var(--primary); padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 700; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+    .banner-bogota { background: var(--accent-light); border: 1px solid var(--accent); color: var(--primary); padding: 12px 18px; border-radius: 8px; margin-bottom: 20px; font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(480px, 1fr)); gap: 18px; }
+    .card { background: var(--card-bg); border-radius: 10px; padding: 20px; border: 1px solid var(--border); box-shadow: 0 2px 8px rgba(0,0,0,0.03); display: flex; flex-direction: column; justify-content: space-between; }
+    .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .card-header h2 { font-size: 15px; font-weight: 700; color: var(--primary); display: flex; align-items: center; gap: 8px; }
+    .method-badge { font-size: 11px; font-family: monospace; font-weight: 700; padding: 3px 8px; border-radius: 4px; }
+    .method-get { background: #E3F2FD; color: #0D47A1; }
+    .method-post { background: #E8F5E9; color: #1B5E20; }
+    .method-patch { background: #FFF8E1; color: #F57F17; }
+    .method-delete { background: #FFEBEE; color: #B71C1C; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .form-group { margin-bottom: 10px; }
+    label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 3px; color: var(--muted); }
+    input, select { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; outline: none; }
+    input:focus, select:focus { border-color: var(--accent); ring: 2px solid rgba(82, 183, 136, 0.3); }
+    button { background: var(--primary); color: white; border: none; padding: 9px 14px; border-radius: 6px; font-weight: 600; font-size: 13px; cursor: pointer; transition: all 0.2s; width: 100%; margin-top: 6px; }
     button:hover { background: var(--primary-light); }
-    button.secondary { background: #495057; margin-top: 8px; }
-    button.secondary:hover { background: #343A40; }
-    pre { background: #212529; color: #A7F3D0; padding: 14px; border-radius: 6px; font-family: 'Consolas', 'Monaco', monospace; font-size: 12px; max-height: 200px; overflow-y: auto; margin-top: 12px; white-space: pre-wrap; word-break: break-all; }
-    .token-display { background: #FFF3CD; border: 1px solid #FFEBAA; color: #856404; padding: 10px; border-radius: 6px; font-size: 12px; margin-top: 10px; word-break: break-all; }
-    .footer { text-align: center; margin-top: 30px; font-size: 13px; color: var(--muted); }
+    button.btn-danger { background: var(--danger); }
+    button.btn-danger:hover { background: #C5221F; }
+    button.btn-outline { background: transparent; border: 1px solid var(--primary); color: var(--primary); }
+    button.btn-outline:hover { background: var(--accent-light); }
+    pre { background: #1B262C; color: #52B788; padding: 12px; border-radius: 6px; font-family: 'Consolas', monospace; font-size: 11px; max-height: 180px; overflow-y: auto; margin-top: 10px; white-space: pre-wrap; word-break: break-all; }
+    .token-bar { background: #FEF3C7; border: 1px solid #F59E0B; color: #92400E; padding: 10px 14px; border-radius: 6px; margin-bottom: 18px; font-size: 12px; display: none; }
+    .footer { text-align: center; margin-top: 25px; font-size: 12px; color: var(--muted); }
   </style>
 </head>
 <body>
   <div class="container">
     <header>
-      <h1>DATA_CIRCULAR - Consola de Pruebas en Vivo</h1>
-      <p class="subtitle">Práctica Universitaria &middot; Fundación IMARA &middot; Backend REST v1</p>
-      <span class="badge" id="server-status">Comprobando conexión...</span>
+      <div class="header-text">
+        <h1>DATA_CIRCULAR &middot; Consola de Verificación en Vivo</h1>
+        <p>Proyecto de Práctica Universitaria &middot; Fundación IMARA &middot; Fases 1 a 4 Verificadas</p>
+      </div>
+      <div class="status-pill" id="global-db-status">PostgreSQL: Conectando...</div>
     </header>
 
+    <div class="banner-bogota">
+      <span>📍 <strong>Territorio:</strong> Bogotá D.C., Colombia &middot; <strong>Moneda:</strong> Peso Colombiano (COP) &middot; <strong>Zona Horaria:</strong> America/Bogota (UTC-5)</span>
+      <button class="btn-outline" style="width:auto; padding:4px 12px; margin:0;" onclick="window.open('http://localhost:5555', '_blank')">Abrir Prisma Studio (BD Visual)</button>
+    </div>
+
+    <!-- Barra de Token Activo -->
+    <div id="token-status-bar" class="token-bar">
+      <strong>Sesión Activa:</strong> <span id="token-preview"></span>
+      <button style="width:auto; padding:3px 8px; margin-left:10px; font-size:11px;" onclick="copyToken()">Copiar Token</button>
+    </div>
+
     <div class="grid">
-      <!-- 1. Health Check -->
+      <!-- 1. Health Check (Fase 1) -->
       <div class="card">
-        <h2>1. Estado del Backend y Base de Datos <span class="badge-method">GET /api/v1/health</span></h2>
-        <p style="font-size: 13px; color: var(--muted); margin-bottom: 12px;">Comprueba la conexión en tiempo real con PostgreSQL (base de datos <code>data_circular_dev</code>).</p>
-        <button onclick="testHealth()">Ejecutar Comprobación de Salud</button>
-        <pre id="health-output">// Haz clic en el botón para comprobar el estado...</pre>
+        <div>
+          <div class="card-header">
+            <h2>🩺 1. Estado y Base de Datos</h2>
+            <span class="method-badge method-get">GET /api/v1/health</span>
+          </div>
+          <p style="font-size:12px; color:var(--muted); margin-bottom:8px;">Verifica en tiempo real la conectividad y latencia con PostgreSQL en Bogotá.</p>
+        </div>
+        <div>
+          <button onclick="runHealth()">Probar Conexión PostgreSQL</button>
+          <pre id="out-health">// Haz clic para comprobar salud de la BD...</pre>
+        </div>
       </div>
 
-      <!-- 2. Registro de Usuario -->
+      <!-- 2. Registro (Fase 2 y 3) -->
       <div class="card">
-        <h2>2. Registrar Usuario en PostgreSQL <span class="badge-method">POST /api/v1/auth/register</span></h2>
-        <div class="form-group">
-          <label>Nombre Completo</label>
-          <input type="text" id="reg-name" value="Edgar Usuario">
+        <div>
+          <div class="card-header">
+            <h2>📝 2. Registro de Usuario (Bogotá)</h2>
+            <span class="method-badge method-post">POST /api/v1/auth/register</span>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Nombre Completo</label>
+              <input type="text" id="reg-name" value="Recuperador Bogotá">
+            </div>
+            <div class="form-group">
+              <label>Localidad de Bogotá</label>
+              <select id="reg-loc">${localitiesOptions}</select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Correo Electrónico</label>
+              <input type="email" id="reg-email" value="recuperador.bogota@imara.org">
+            </div>
+            <div class="form-group">
+              <label>Celular (+57 Colombia)</label>
+              <input type="text" id="reg-phone" value="+57 310 123 4567">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Contraseña (Mín. 8 caracteres, mayúscula, símbolo)</label>
+            <input type="password" id="reg-pass" value="ImaraBogota2026!#">
+          </div>
         </div>
-        <div class="form-group">
-          <label>Correo Electrónico</label>
-          <input type="email" id="reg-email" value="edgar.prueba@imara.org">
+        <div>
+          <button onclick="runRegister()">Registrar con Hash Argon2id</button>
+          <pre id="out-reg">// El usuario creado con UUIDv4 aparecerá aquí...</pre>
         </div>
-        <div class="form-group">
-          <label>Contraseña (Mín. 8 caracteres, mayúscula, número, símbolo)</label>
-          <input type="password" id="reg-password" value="Imara2026!#">
-        </div>
-        <div class="form-group">
-          <label>Teléfono (Opcional)</label>
-          <input type="text" id="reg-phone" value="+57 300 123 4567">
-        </div>
-        <button onclick="testRegister()">Crear Usuario con Argon2id</button>
-        <pre id="reg-output">// El usuario creado aparecerá aquí con su UUID...</pre>
       </div>
 
-      <!-- 3. Inicio de Sesión -->
+      <!-- 3. Login (Fase 3) -->
       <div class="card">
-        <h2>3. Iniciar Sesión (Login) <span class="badge-method">POST /api/v1/auth/login</span></h2>
-        <div class="form-group">
-          <label>Correo Electrónico</label>
-          <input type="email" id="login-email" value="edgar.prueba@imara.org">
+        <div>
+          <div class="card-header">
+            <h2>🔐 3. Inicio de Sesión (Login)</h2>
+            <span class="method-badge method-post">POST /api/v1/auth/login</span>
+          </div>
+          <div class="form-group">
+            <label>Correo Electrónico</label>
+            <input type="email" id="login-email" value="recuperador.bogota@imara.org">
+          </div>
+          <div class="form-group">
+            <label>Contraseña</label>
+            <input type="password" id="login-pass" value="ImaraBogota2026!#">
+          </div>
         </div>
-        <div class="form-group">
-          <label>Contraseña</label>
-          <input type="password" id="login-password" value="Imara2026!#">
+        <div>
+          <button onclick="runLogin()">Iniciar Sesión y Capturar JWT</button>
+          <pre id="out-login">// El token y datos de sesión se mostrarán aquí...</pre>
         </div>
-        <button onclick="testLogin()">Iniciar Sesión y Obtener Tokens</button>
-        <div id="token-box" class="token-display" style="display:none;"></div>
-        <pre id="login-output">// El resultado del login se mostrará aquí...</pre>
       </div>
 
-      <!-- 4. Cierre de Sesión -->
+      <!-- 4. Consultar Mi Perfil (Fase 4) -->
       <div class="card">
-        <h2>4. Cierre de Sesión (Logout) <span class="badge-method">POST /api/v1/auth/logout</span></h2>
-        <p style="font-size: 13px; color: var(--muted); margin-bottom: 12px;">Envía la petición con el token JWT obtenido del inicio de sesión.</p>
-        <button onclick="testLogout()">Cerrar Sesión con Token Activo</button>
-        <button class="secondary" onclick="openStudioHelp()">Ver Base de Datos con Prisma Studio</button>
-        <pre id="logout-output">// El resultado del logout se mostrará aquí...</pre>
+        <div>
+          <div class="card-header">
+            <h2>👤 4. Consultar Mi Perfil Propio</h2>
+            <span class="method-badge method-get">GET /api/v1/users/me</span>
+          </div>
+          <p style="font-size:12px; color:var(--muted); margin-bottom:8px;">Requiere token activo. Devuelve SafeUserDto (email, celular, rol, estado).</p>
+        </div>
+        <div>
+          <button onclick="runGetMe()">Consultar Mi Perfil en PostgreSQL</button>
+          <pre id="out-me">// Tu perfil privado aparecerá aquí...</pre>
+        </div>
+      </div>
+
+      <!-- 5. Actualizar Mi Perfil (Fase 4) -->
+      <div class="card">
+        <div>
+          <div class="card-header">
+            <h2>✏️ 5. Actualizar Datos Permitidos</h2>
+            <span class="method-badge method-patch">PATCH /api/v1/users/me</span>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Nuevo Nombre Completo</label>
+              <input type="text" id="patch-name" value="Recuperador Certificado IMARA">
+            </div>
+            <div class="form-group">
+              <label>Nuevo Celular (+57)</label>
+              <input type="text" id="patch-phone" value="+57 320 888 9900">
+            </div>
+          </div>
+        </div>
+        <div>
+          <button onclick="runPatchMe()">Guardar Cambios en PostgreSQL</button>
+          <pre id="out-patch">// El perfil actualizado en BD aparecerá aquí...</pre>
+        </div>
+      </div>
+
+      <!-- 6. Perfil Público vs Desactivación (Fase 4) -->
+      <div class="card">
+        <div>
+          <div class="card-header">
+            <h2>🛡️ 6. Privacidad y Desactivación</h2>
+            <span class="method-badge method-delete">DELETE /api/v1/users/me</span>
+          </div>
+          <p style="font-size:12px; color:var(--muted); margin-bottom:10px;">
+            <strong>Privacidad:</strong> Los otros usuarios solo ven <code>PublicUserDto</code> (oculta email y celular).<br>
+            <strong>Desactivación:</strong> Aplica Soft Delete preservando integridad histórica.
+          </p>
+          <button class="btn-outline" style="margin-bottom:8px;" onclick="runGetPublic()">Ver Mi Vista Pública (Sin Datos Privados)</button>
+        </div>
+        <div>
+          <button class="btn-danger" onclick="runDeleteMe()">Desactivar Mi Cuenta (Soft Delete)</button>
+          <pre id="out-delete">// El resultado se mostrará aquí...</pre>
+        </div>
       </div>
     </div>
 
     <div class="footer">
-      DATA_CIRCULAR &copy; 2026 Fundación IMARA &middot; Arquitectura Modular Limpia
+      DATA_CIRCULAR &copy; 2026 &middot; Fundación IMARA &middot; Bogotá D.C., Colombia
     </div>
   </div>
 
   <script>
-    let currentAccessToken = null;
+    let activeToken = null;
+    let currentUserId = null;
 
-    async function testHealth() {
-      const out = document.getElementById('health-output');
-      out.textContent = 'Consultando /api/v1/health...';
+    async function runHealth() {
+      const el = document.getElementById('out-health');
+      el.textContent = 'Consultando /api/v1/health...';
       try {
         const res = await fetch('/api/v1/health');
         const data = await res.json();
-        out.textContent = JSON.stringify(data, null, 2);
-        const badge = document.getElementById('server-status');
+        el.textContent = JSON.stringify(data, null, 2);
+        const pill = document.getElementById('global-db-status');
         if (data.success && data.data && data.data.database.status === 'connected') {
-          badge.textContent = 'PostgreSQL Conectado (' + data.data.database.latencyMs + 'ms)';
-          badge.style.background = '#A7F3D0';
-          badge.style.color = '#065F46';
+          pill.textContent = 'PostgreSQL: Conectado (' + data.data.database.latencyMs + 'ms)';
+          pill.style.background = '#52B788';
+          pill.style.color = '#1B4332';
         } else {
-          badge.textContent = 'Servicio Degradado';
-          badge.style.background = '#FCA5A5';
-          badge.style.color = '#7F1D1D';
+          pill.textContent = 'PostgreSQL: Desconectado';
+          pill.style.background = '#E63946';
+          pill.style.color = '#FFFFFF';
         }
       } catch (err) {
-        out.textContent = 'Error: ' + err.message;
+        el.textContent = 'Error: ' + err.message;
       }
     }
 
-    async function testRegister() {
-      const out = document.getElementById('reg-output');
-      out.textContent = 'Enviando petición a /api/v1/auth/register...';
-      const payload = {
+    async function runRegister() {
+      const el = document.getElementById('out-reg');
+      el.textContent = 'Enviando registro a /api/v1/auth/register...';
+      const body = {
         fullName: document.getElementById('reg-name').value,
         email: document.getElementById('reg-email').value,
-        password: document.getElementById('reg-password').value,
-        phone: document.getElementById('reg-phone').value || undefined,
+        password: document.getElementById('reg-pass').value,
+        phone: document.getElementById('reg-phone').value,
       };
       try {
         const res = await fetch('/api/v1/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+          body: JSON.stringify(body)
         });
         const data = await res.json();
-        out.textContent = 'Status ' + res.status + ':\\n' + JSON.stringify(data, null, 2);
-        if (data.success && data.data && data.data.tokens) {
-          currentAccessToken = data.data.tokens.accessToken;
-          showToken(currentAccessToken);
+        el.textContent = 'HTTP ' + res.status + ':\\n' + JSON.stringify(data, null, 2);
+        if (data.success && data.data) {
+          activeToken = data.data.tokens.accessToken;
+          currentUserId = data.data.user.id;
+          updateTokenBar();
         }
       } catch (err) {
-        out.textContent = 'Error: ' + err.message;
+        el.textContent = 'Error: ' + err.message;
       }
     }
 
-    async function testLogin() {
-      const out = document.getElementById('login-output');
-      out.textContent = 'Enviando petición a /api/v1/auth/login...';
-      const payload = {
+    async function runLogin() {
+      const el = document.getElementById('out-login');
+      el.textContent = 'Iniciando sesión en /api/v1/auth/login...';
+      const body = {
         email: document.getElementById('login-email').value,
-        password: document.getElementById('login-password').value,
+        password: document.getElementById('login-pass').value,
       };
       try {
         const res = await fetch('/api/v1/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+          body: JSON.stringify(body)
         });
         const data = await res.json();
-        out.textContent = 'Status ' + res.status + ':\\n' + JSON.stringify(data, null, 2);
-        if (data.success && data.data && data.data.tokens) {
-          currentAccessToken = data.data.tokens.accessToken;
-          showToken(currentAccessToken);
+        el.textContent = 'HTTP ' + res.status + ':\\n' + JSON.stringify(data, null, 2);
+        if (data.success && data.data) {
+          activeToken = data.data.tokens.accessToken;
+          currentUserId = data.data.user.id;
+          updateTokenBar();
         }
       } catch (err) {
-        out.textContent = 'Error: ' + err.message;
+        el.textContent = 'Error: ' + err.message;
       }
     }
 
-    function showToken(token) {
-      const box = document.getElementById('token-box');
-      box.style.display = 'block';
-      box.innerHTML = '<strong>JWT Token activo:</strong><br><small style="word-break:break-all;">' + token.substring(0, 60) + '...</small>';
-    }
-
-    async function testLogout() {
-      const out = document.getElementById('logout-output');
-      if (!currentAccessToken) {
-        out.textContent = 'Aviso: No tienes un token activo. Primero realiza Login o Registro para obtener un token.';
+    async function runGetMe() {
+      const el = document.getElementById('out-me');
+      if (!activeToken) {
+        el.textContent = 'Aviso: Primero debes iniciar sesión o registrarte para obtener un token JWT.';
         return;
       }
-      out.textContent = 'Enviando petición a /api/v1/auth/logout...';
+      el.textContent = 'Consultando /api/v1/users/me...';
       try {
-        const res = await fetch('/api/v1/auth/logout', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + currentAccessToken
-          }
+        const res = await fetch('/api/v1/users/me', {
+          headers: { 'Authorization': 'Bearer ' + activeToken }
         });
         const data = await res.json();
-        out.textContent = 'Status ' + res.status + ':\\n' + JSON.stringify(data, null, 2);
-        currentAccessToken = null;
-        document.getElementById('token-box').style.display = 'none';
+        el.textContent = 'HTTP ' + res.status + ':\\n' + JSON.stringify(data, null, 2);
+        if (data.success && data.data) {
+          currentUserId = data.data.id;
+        }
       } catch (err) {
-        out.textContent = 'Error: ' + err.message;
+        el.textContent = 'Error: ' + err.message;
       }
     }
 
-    function openStudioHelp() {
-      alert('Para explorar gráficamente las tablas de PostgreSQL:\\nEn tu terminal ejecuta: npm run db:studio\\nSe abrirá automáticamente en http://localhost:5555');
+    async function runPatchMe() {
+      const el = document.getElementById('out-patch');
+      if (!activeToken) {
+        el.textContent = 'Aviso: Primero debes iniciar sesión para actualizar tu perfil.';
+        return;
+      }
+      el.textContent = 'Actualizando /api/v1/users/me en PostgreSQL...';
+      const body = {
+        fullName: document.getElementById('patch-name').value,
+        phone: document.getElementById('patch-phone').value,
+      };
+      try {
+        const res = await fetch('/api/v1/users/me', {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + activeToken
+          },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        el.textContent = 'HTTP ' + res.status + ':\\n' + JSON.stringify(data, null, 2);
+      } catch (err) {
+        el.textContent = 'Error: ' + err.message;
+      }
     }
 
-    // Ejecutar comprobación al cargar la página
-    window.addEventListener('load', testHealth);
+    async function runGetPublic() {
+      const el = document.getElementById('out-delete');
+      if (!currentUserId || !activeToken) {
+        el.textContent = 'Aviso: Primero inicia sesión para consultar un perfil.';
+        return;
+      }
+      el.textContent = 'Consultando vista pública /api/v1/users/' + currentUserId + '...';
+      try {
+        const res = await fetch('/api/v1/users/' + currentUserId, {
+          headers: { 'Authorization': 'Bearer ' + activeToken }
+        });
+        const data = await res.json();
+        el.textContent = 'VISTA PÚBLICA EN MARKETPLACE (Oculta email y teléfono por privacidad):\\n' + JSON.stringify(data, null, 2);
+      } catch (err) {
+        el.textContent = 'Error: ' + err.message;
+      }
+    }
+
+    async function runDeleteMe() {
+      const el = document.getElementById('out-delete');
+      if (!activeToken) {
+        el.textContent = 'Aviso: Debes tener una sesión activa.';
+        return;
+      }
+      if (!confirm('¿Seguro que deseas desactivar tu cuenta? Se aplicará Soft Delete en PostgreSQL.')) return;
+      el.textContent = 'Enviando solicitud de desactivación a /api/v1/users/me...';
+      try {
+        const res = await fetch('/api/v1/users/me', {
+          method: 'DELETE',
+          headers: { 'Authorization': 'Bearer ' + activeToken }
+        });
+        const data = await res.json();
+        el.textContent = 'HTTP ' + res.status + ':\\n' + JSON.stringify(data, null, 2);
+        activeToken = null;
+        document.getElementById('token-status-bar').style.display = 'none';
+      } catch (err) {
+        el.textContent = 'Error: ' + err.message;
+      }
+    }
+
+    function updateTokenBar() {
+      const bar = document.getElementById('token-status-bar');
+      const preview = document.getElementById('token-preview');
+      bar.style.display = 'block';
+      preview.textContent = activeToken.substring(0, 50) + '... (Válido en cabecera Bearer)';
+    }
+
+    function copyToken() {
+      if (activeToken) {
+        navigator.clipboard.writeText(activeToken);
+        alert('Token JWT copiado al portapapeles.');
+      }
+    }
+
+    window.addEventListener('load', runHealth);
   </script>
 </body>
 </html>`);
