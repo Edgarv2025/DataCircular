@@ -2,6 +2,7 @@ import express, { Application } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { v1Router } from './routes/v1.routes';
+import { dashboardRouter } from './modules/dashboard/dashboard.routes';
 import { errorHandler } from './middleware/errorHandler';
 import { notFoundHandler } from './middleware/notFoundHandler';
 import { env } from './config/env';
@@ -10,7 +11,11 @@ export function createApp(): Application {
   const app: Application = express();
 
   // Middleware de Seguridad HTTP Headers
-  app.use(helmet());
+  app.use(
+    helmet({
+      contentSecurityPolicy: env.NODE_ENV === 'production' ? undefined : false,
+    })
+  );
 
   // Configuración de CORS
   const allowedOrigins = env.CORS_ORIGIN.split(',').map((o) => o.trim());
@@ -33,6 +38,9 @@ export function createApp(): Application {
   // Parseo de cuerpo JSON y URL-encoded
   app.use(express.json({ limit: '5mb' }));
   app.use(express.urlencoded({ extended: true, limit: '5mb' }));
+
+  // Consola Interactiva para pruebas visuales en navegador
+  app.use('/', dashboardRouter);
 
   // Rutas versionadas de la API
   app.use('/api/v1', v1Router);
