@@ -1,0 +1,28 @@
+{
+  "name": "data-circular",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Plataforma colaborativa para conectar generadores, transportadores, recuperadores y transformadores de materiales recuperables - Fundación IMARA",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "npm --workspace=apps/api run dev",
+    "build:api": "npm --workspace=apps/api run build",
+    "start:api": "npm --workspace=apps/api run start",
+    "test:api": "npm --workspace=apps/api run test",
+    "db:migrate": "npm --workspace=apps/api run db:migrate",
+    "db:generate": "npm --workspace=apps/api run db:generate",
+    "db:studio": "npm --workspace=apps/api run db:studio"
+  },
+  "keywords": [
+    "circular-economy",
+    "recycling",
+    "marketplace",
+    "data-circular",
+    "imara"
+  ],
+  "author": "Fundación IMARA / DATA_CIRCULAR Team",
+  "license": "UNLICENSED"
+}

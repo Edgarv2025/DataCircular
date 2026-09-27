@@ -1,0 +1,14 @@
+// DATA_CIRCULAR - Prisma Schema
+// Fundación IMARA - Proyecto de Economía Circular
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Nota: Las entidades de dominio (User, Organization, Material, etc.)
+// se incorporarán en la Fase 2 y fases posteriores según el plan maestro aprobado.

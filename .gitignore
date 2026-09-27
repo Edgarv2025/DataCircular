@@ -1,0 +1,55 @@
+# Node & Workspaces
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Compilación y builds
+dist/
+build/
+.turbo/
+
+# Expo / React Native
+.expo/
+web-build/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# Variables de entorno y secretos (NUNCA versionar)
+.env
+.env.local
+.env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Bases de datos y almacenamiento local
+*.sqlite
+*.sqlite3
+*.db
+postgres-data/
+
+# Logs
+logs/
+*.log
+
+# Cobertura y testing
+coverage/
+.nyc_output/
+
+# IDE y editores
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# TypeScript
+*.tsbuildinfo
