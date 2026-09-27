@@ -2,8 +2,98 @@ import { z } from 'zod';
 
 /**
  * DATA_CIRCULAR - Paquete Compartido (Shared)
- * Contiene contratos de API, tipos comunes y esquemas compartidos entre API y Mobile.
+ * Contratos de API, tipos de dominio, esquemas de validación y localización (Bogotá, Colombia).
+ * Contexto: Proyecto de Práctica Universitaria - Fundación IMARA
  */
+
+// ==========================================
+// Localización y Contexto Territorial (Colombia - Bogotá D.C.)
+// ==========================================
+
+export const COUNTRY_CONFIG = {
+  country: 'Colombia',
+  countryCode: 'CO',
+  dialCode: '+57',
+  currency: 'COP',
+  currencySymbol: '$',
+  locale: 'es-CO',
+  timezone: 'America/Bogota', // UTC-5
+};
+
+export const BOGOTA_LOCATION = {
+  city: 'Bogotá D.C.',
+  department: 'Bogotá D.C.',
+  country: 'Colombia',
+  coordinates: {
+    latitude: 4.7110,
+    longitude: -74.0721,
+  },
+};
+
+/**
+ * Las 20 Localidades Oficiales de Bogotá D.C.
+ */
+export const BOGOTA_LOCALITIES = [
+  'Usaquén',
+  'Chapinero',
+  'Santa Fe',
+  'San Cristóbal',
+  'Usme',
+  'Tunjuelito',
+  'Bosa',
+  'Kennedy',
+  'Fontibón',
+  'Engativá',
+  'Suba',
+  'Barrios Unidos',
+  'Teusaquillo',
+  'Los Mártires',
+  'Antonio Nariño',
+  'Puente Aranda',
+  'La Candelaria',
+  'Rafael Uribe Uribe',
+  'Ciudad Bolívar',
+  'Sumapaz',
+] as const;
+
+export type BogotaLocality = (typeof BOGOTA_LOCALITIES)[number];
+
+/**
+ * Formato de moneda colombiana (COP)
+ * Ejemplo: formatCOP(250000) => "$ 250.000 COP"
+ */
+export function formatCOP(amount: number): string {
+  return new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount) + ' COP';
+}
+
+/**
+ * Categorías principales de materiales recuperables en Colombia
+ * Basado en la normativa ambiental colombiana (Resolución 2184 de 2019 / Código de Colores)
+ */
+export const MATERIAL_CATEGORIES_COLOMBIA = [
+  { id: 'PLASTICOS', name: 'Plásticos Aprovechables', subcategories: ['PET', 'PEAD / HDPE', 'PEBD / LDPE', 'PP (Polipropileno)', 'PVC'] },
+  { id: 'METALES', name: 'Metales y Chatarra', subcategories: ['Aluminio (Latas/Perfiles)', 'Cobre', 'Bronce', 'Hierro / Chatarra ferrosa', 'Acero'] },
+  { id: 'PAPEL_CARTON', name: 'Papel y Cartón', subcategories: ['Cartón Corrugado / Ondulado', 'Papel Archivo Blanco', 'Plegadiza', 'Periódico'] },
+  { id: 'VIDRIO', name: 'Vidrio Aprovechable', subcategories: ['Vidrio Transparente', 'Vidrio Verde', 'Vidrio Ámbar'] },
+  { id: 'RAEE', name: 'Residuos Eléctricos y Electrónicos (RAEE)', subcategories: ['Equipos de Cómputo', 'Celulares y Baterías', 'Electrodomésticos'] },
+  { id: 'TEXTILES', name: 'Textiles Recuperables', subcategories: ['Retazos Industriales', 'Algodón', 'Prendas en Desuso'] },
+  { id: 'ORGANICOS', name: 'Orgánicos y Biomasa', subcategories: ['Residuos de Alimentos no Cocinados', 'Podas y Jardinería', 'Residuos Agroindustriales'] },
+] as const;
+
+// ==========================================
+// Expresión Regular para Celulares en Colombia
+// Válido para formato local 3XXXXXXXXX o internacional +57 3XXXXXXXXX
+// ==========================================
+export const COLOMBIA_PHONE_REGEX = /^(?:\+?57\s?)?3\d{2}\s?\d{3}\s?\d{4}$/;
+
+// ==========================================
+// Interfaces Base de API
+// ==========================================
 
 export interface ApiResponse<T = unknown> {
   success: boolean;
@@ -36,10 +126,6 @@ export interface HealthCheckData {
 export type UserStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
 export type UserRole = 'USER' | 'ADMIN';
 
-/**
- * Representación segura de usuario para consumo autenticado (perfil propio).
- * NUNCA incluye passwordHash.
- */
 export interface SafeUserDto {
   id: string;
   fullName: string;
@@ -52,10 +138,6 @@ export interface SafeUserDto {
   deletedAt: string | null;
 }
 
-/**
- * Representación pública de un usuario (para otros usuarios del marketplace).
- * Omite deliberadamente email, teléfono, status privado y metadatos sensibles.
- */
 export interface PublicUserDto {
   id: string;
   fullName: string;
@@ -84,13 +166,9 @@ export interface AdminUpdateUserInput {
 }
 
 // ==========================================
-// Esquemas de Validación con Zod (Fase 3: Auth)
+// Esquemas de Validación con Zod (Fase 3 y 4)
 // ==========================================
 
-/**
- * Expresión regular para contraseña segura:
- * Al menos 8 caracteres, 1 mayúscula, 1 minúscula, 1 número y 1 carácter especial.
- */
 export const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#^()_+=\-\[\]{}|:;<>,./~`]).{8,100}$/;
 
 export const registerSchema = z.object({
@@ -154,10 +232,6 @@ export interface AuthResponseDto {
   user: SafeUserDto;
   tokens: AuthTokens;
 }
-
-// ==========================================
-// Esquemas de Validación (Fase 4: CRUD Usuarios)
-// ==========================================
 
 export const updateProfileSchema = z.object({
   fullName: z
