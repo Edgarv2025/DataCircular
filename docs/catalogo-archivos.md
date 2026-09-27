@@ -49,7 +49,7 @@ Este catálogo describe de manera exhaustiva cada archivo creado en el proyecto,
 
 ### `src/index.ts`
 - **Ruta**: `/packages/shared/src/index.ts`
-- **Propósito**: Exporta las interfaces de respuesta genéricas (`ApiResponse<T>`) y la estructura del healthcheck (`HealthCheckData`).
+- **Propósito**: Exporta las interfaces de respuesta genéricas (`ApiResponse<T>`), la estructura del healthcheck (`HealthCheckData`), y los tipos de usuario (`SafeUserDto`, `UserStatus`, `UserRole`, `CreateUserInput`, `UpdateUserInput`).
 
 ---
 
@@ -65,7 +65,11 @@ Este catálogo describe de manera exhaustiva cada archivo creado en el proyecto,
 
 ### `prisma/schema.prisma`
 - **Ruta**: `/apps/api/prisma/schema.prisma`
-- **Propósito**: Esquema de base de datos para Prisma ORM conectado al datasource de PostgreSQL.
+- **Propósito**: Esquema de base de datos para Prisma ORM con datasource PostgreSQL, enums `UserStatus`, `UserRole` y entidad `User`.
+
+### `prisma/migrations/20260927180227_init_user_model/migration.sql`
+- **Ruta**: `/apps/api/prisma/migrations/20260927180227_init_user_model/migration.sql`
+- **Propósito**: Script SQL puro de la primera migración versionada. Crea los tipos ENUM, la tabla `users` con claves foráneas, índices y restricciones de unicidad.
 
 ### `.env` (Ignorado por Git) y `.env.example`
 - **Rutas**: `/apps/api/.env`, `/apps/api/.env.example`
@@ -99,6 +103,10 @@ Este catálogo describe de manera exhaustiva cada archivo creado en el proyecto,
 - **Ruta**: `/apps/api/src/modules/health/health.routes.ts`
 - **Propósito**: Define la ruta `GET /` del módulo de salud.
 
+### `src/modules/users/users.repository.ts`
+- **Ruta**: `/apps/api/src/modules/users/users.repository.ts`
+- **Propósito**: Capa de persistencia para el modelo `User`. Encapsula la normalización de correos electrónicos (`normalizeEmail`), la proyección segura (`toSafeUser`), el borrado lógico (`softDelete`) y las consultas tipadas de Prisma.
+
 ### `src/routes/v1.routes.ts`
 - **Ruta**: `/apps/api/src/routes/v1.routes.ts`
 - **Propósito**: Enrutador raíz para la versión 1 de la API (`/api/v1`). Agrupa todos los submódulos.
@@ -114,6 +122,16 @@ Este catálogo describe de manera exhaustiva cada archivo creado en el proyecto,
 ### `tests/health.test.ts`
 - **Ruta**: `/apps/api/tests/health.test.ts`
 - **Propósito**: Suite de pruebas automatizadas con Supertest para verificar el endpoint `/api/v1/health` y el manejo de 404.
+
+### `tests/user-persistence.test.ts`
+- **Ruta**: `/apps/api/tests/user-persistence.test.ts`
+- **Propósito**: Suite de pruebas de persistencia sobre PostgreSQL que valida:
+  1. Generación de identificador UUIDv4 y valores predeterminados.
+  2. Restricción estricta de correo único (código `P2002`).
+  3. Normalización automática de emails (minúsculas y trim).
+  4. Borrado lógico (`softDelete`) manteniendo la integridad de filas.
+  5. Actualización segura de campos de perfil.
+  6. Ausencia de `passwordHash` en DTOs seguros.
 
 ---
 

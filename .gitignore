@@ -10,6 +10,8 @@ lerna-debug.log*
 dist/
 build/
 .turbo/
+**/src/generated/
+*.node
 
 # Expo / React Native
 .expo/

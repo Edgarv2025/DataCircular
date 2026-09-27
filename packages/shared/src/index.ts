@@ -26,3 +26,39 @@ export interface HealthCheckData {
   };
   environment: string;
 }
+
+// ==========================================
+// Tipos de Dominio de Usuario (Fase 2)
+// ==========================================
+
+export type UserStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
+export type UserRole = 'USER' | 'ADMIN';
+
+/**
+ * Representación segura de usuario para consumo público / frontend.
+ * NUNCA incluye passwordHash ni información de seguridad sensible.
+ */
+export interface SafeUserDto {
+  id: string;
+  fullName: string;
+  email: string;
+  phone: string | null;
+  status: UserStatus;
+  role: UserRole;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+}
+
+export interface CreateUserInput {
+  fullName: string;
+  email: string;
+  phone?: string | null;
+  passwordHash: string;
+  role?: UserRole;
+}
+
+export interface UpdateUserInput {
+  fullName?: string;
+  phone?: string | null;
+}

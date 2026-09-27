@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../generated/prisma-client';
 
 declare global {
   // Evitar múltiples instancias de Prisma Client en desarrollo con recarga en caliente
