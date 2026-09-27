@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 /**
  * DATA_CIRCULAR - Paquete Compartido (Shared)
  * Contiene contratos de API, tipos comunes y esquemas compartidos entre API y Mobile.
@@ -61,4 +63,76 @@ export interface CreateUserInput {
 export interface UpdateUserInput {
   fullName?: string;
   phone?: string | null;
+}
+
+// ==========================================
+// Esquemas de Validación con Zod (Fase 3: Auth)
+// ==========================================
+
+/**
+ * Expresión regular para contraseña segura:
+ * Al menos 8 caracteres, 1 mayúscula, 1 minúscula, 1 número y 1 carácter especial.
+ */
+export const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#^()_+=\-\[\]{}|:;<>,./~`]).{8,100}$/;
+
+export const registerSchema = z.object({
+  fullName: z
+    .string({ required_error: 'El nombre completo es requerido' })
+    .trim()
+    .min(3, 'El nombre debe tener al menos 3 caracteres')
+    .max(150, 'El nombre no puede exceder 150 caracteres'),
+  email: z
+    .string({ required_error: 'El correo electrónico es requerido' })
+    .trim()
+    .toLowerCase()
+    .email('Formato de correo electrónico inválido')
+    .max(255, 'El correo no puede exceder 255 caracteres'),
+  password: z
+    .string({ required_error: 'La contraseña es requerida' })
+    .min(8, 'La contraseña debe tener al menos 8 caracteres')
+    .max(100, 'La contraseña no puede exceder 100 caracteres')
+    .regex(
+      PASSWORD_REGEX,
+      'La contraseña debe incluir al menos una letra mayúscula, una minúscula, un número y un carácter especial'
+    ),
+  phone: z
+    .string()
+    .trim()
+    .max(30, 'El teléfono no puede exceder 30 caracteres')
+    .optional()
+    .nullable(),
+});
+
+export type RegisterDto = z.infer<typeof registerSchema>;
+
+export const loginSchema = z.object({
+  email: z
+    .string({ required_error: 'El correo electrónico es requerido' })
+    .trim()
+    .toLowerCase()
+    .email('Formato de correo electrónico inválido'),
+  password: z
+    .string({ required_error: 'La contraseña es requerida' })
+    .min(1, 'La contraseña es requerida'),
+});
+
+export type LoginDto = z.infer<typeof loginSchema>;
+
+export const refreshTokenSchema = z.object({
+  refreshToken: z
+    .string({ required_error: 'El token de actualización es requerido' })
+    .min(10, 'Token de actualización inválido'),
+});
+
+export type RefreshTokenDto = z.infer<typeof refreshTokenSchema>;
+
+export interface AuthTokens {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: string;
+}
+
+export interface AuthResponseDto {
+  user: SafeUserDto;
+  tokens: AuthTokens;
 }

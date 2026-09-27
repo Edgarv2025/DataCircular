@@ -13,6 +13,7 @@ Este catálogo describe de manera exhaustiva cada archivo creado en el proyecto,
   - Exclusión de `.env`, `.env.*`.
   - Exclusión de artefactos de compilación (`dist/`, `build/`, `.expo/`).
   - Exclusión de certificados y llaves móviles (`*.jks`, `*.p8`, `*.key`).
+  - Exclusión de clientes generados (`**/src/generated/`, `*.node`).
 
 ### `.env.example`
 - **Ruta**: `/.env.example`
@@ -27,9 +28,11 @@ Este catálogo describe de manera exhaustiva cada archivo creado en el proyecto,
 - **Ruta**: `/package.json`
 - **Propósito**: Configuración central del Monorepo con npm workspaces (`apps/*`, `packages/*`).
 - **Scripts principales**:
-  - `npm run dev:api`: Inicia el backend en modo desarrollo.
-  - `npm run test:api`: Ejecuta la suite de pruebas automatizadas.
+  - `npm run dev:api`: Inicia el backend en modo desarrollo con recarga en caliente.
+  - `npm run test:api`: Ejecuta la suite completa de pruebas automatizadas.
   - `npm run build:api`: Compila TypeScript a JavaScript.
+  - `npm run db:migrate`: Aplica migraciones de Prisma en PostgreSQL.
+  - `npm run db:studio`: Abre la interfaz visual de administración de base de datos.
 
 ### `README.md`
 - **Ruta**: `/README.md`
@@ -49,7 +52,7 @@ Este catálogo describe de manera exhaustiva cada archivo creado en el proyecto,
 
 ### `src/index.ts`
 - **Ruta**: `/packages/shared/src/index.ts`
-- **Propósito**: Exporta las interfaces de respuesta genéricas (`ApiResponse<T>`), la estructura del healthcheck (`HealthCheckData`), y los tipos de usuario (`SafeUserDto`, `UserStatus`, `UserRole`, `CreateUserInput`, `UpdateUserInput`).
+- **Propósito**: Exporta las interfaces de respuesta genéricas (`ApiResponse<T>`), la estructura del healthcheck (`HealthCheckData`), tipos de usuario (`SafeUserDto`, `UserStatus`, `UserRole`), y esquemas de validación con Zod (`registerSchema`, `loginSchema`, `refreshTokenSchema`, `PASSWORD_REGEX`).
 
 ---
 
@@ -57,7 +60,7 @@ Este catálogo describe de manera exhaustiva cada archivo creado en el proyecto,
 
 ### `package.json`
 - **Ruta**: `/apps/api/package.json`
-- **Propósito**: Manifiesto de dependencias del backend (Express, Prisma, Helmet, Cors, Zod, Vitest, Supertest).
+- **Propósito**: Manifiesto de dependencias del backend (Express, Prisma, Argon2, JSONWebToken, Rate Limit, Helmet, Cors, Zod, Vitest, Supertest).
 
 ### `tsconfig.json`
 - **Ruta**: `/apps/api/tsconfig.json`
@@ -65,7 +68,7 @@ Este catálogo describe de manera exhaustiva cada archivo creado en el proyecto,
 
 ### `prisma/schema.prisma`
 - **Ruta**: `/apps/api/prisma/schema.prisma`
-- **Propósito**: Esquema de base de datos para Prisma ORM con datasource PostgreSQL, enums `UserStatus`, `UserRole` y entidad `User`.
+- **Propósito**: Esquema de base de datos para Prisma ORM con datasource PostgreSQL, enums `UserStatus`, `UserRole` y entidad `User`. Generador configurado hacia `../src/generated/prisma-client`.
 
 ### `prisma/migrations/20260927180227_init_user_model/migration.sql`
 - **Ruta**: `/apps/api/prisma/migrations/20260927180227_init_user_model/migration.sql`
@@ -87,6 +90,14 @@ Este catálogo describe de manera exhaustiva cada archivo creado en el proyecto,
 - **Ruta**: `/apps/api/src/utils/apiResponse.ts`
 - **Propósito**: Funciones auxiliares `sendSuccess` y `sendError` para uniformar las respuestas HTTP en toda la API.
 
+### `src/utils/hash.ts`
+- **Ruta**: `/apps/api/src/utils/hash.ts`
+- **Propósito**: Funciones criptográficas `hashPassword` y `verifyPassword` implementadas con **Argon2id** (64 MiB memoria, 3 iteraciones, 4 hilos) bajo estándares OWASP.
+
+### `src/utils/jwt.ts`
+- **Ruta**: `/apps/api/src/utils/jwt.ts`
+- **Propósito**: Funciones de generación y verificación de tokens `generateTokens`, `verifyAccessToken` y `verifyRefreshToken` con claves secretas independientes.
+
 ### `src/middleware/errorHandler.ts`
 - **Ruta**: `/apps/api/src/middleware/errorHandler.ts`
 - **Propósito**: Captura global de excepciones no controladas. Protege los datos internos impidiendo fugas de trazas de pila en producción.
@@ -95,43 +106,57 @@ Este catálogo describe de manera exhaustiva cada archivo creado en el proyecto,
 - **Ruta**: `/apps/api/src/middleware/notFoundHandler.ts`
 - **Propósito**: Manejo estandarizado de rutas HTTP no existentes (código 404).
 
-### `src/modules/health/health.controller.ts`
-- **Ruta**: `/apps/api/src/modules/health/health.controller.ts`
-- **Propósito**: Controlador del endpoint de salud. Consulta el estado de la base de datos y construye el payload con tiempo de actividad y estado del servicio.
+### `src/middleware/validate.ts`
+- **Ruta**: `/apps/api/src/middleware/validate.ts`
+- **Propósito**: Middleware de validación con Zod para el cuerpo de peticiones HTTP. Retorna código 400 estructurado ante fallos.
 
-### `src/modules/health/health.routes.ts`
-- **Ruta**: `/apps/api/src/modules/health/health.routes.ts`
-- **Propósito**: Define la ruta `GET /` del módulo de salud.
+### `src/middleware/rateLimiter.ts`
+- **Ruta**: `/apps/api/src/middleware/rateLimiter.ts`
+- **Propósito**: Control de frecuencia contra ataques de fuerza bruta en login (máx. 10 intentos/15 min) y registro (máx. 20/hora).
+
+### `src/middleware/auth.middleware.ts`
+- **Ruta**: `/apps/api/src/middleware/auth.middleware.ts`
+- **Propósito**: Middleware `authenticateToken` que valida la cabecera `Authorization: Bearer <token>`, verifica la sesión activa en BD y adjunta el usuario autenticado a `req.user`.
+
+### `src/modules/health/health.controller.ts` y `health.routes.ts`
+- **Rutas**: `/apps/api/src/modules/health/health.controller.ts`, `health.routes.ts`
+- **Propósito**: Endpoint `GET /api/v1/health` para comprobación de estado operativo y base de datos.
 
 ### `src/modules/users/users.repository.ts`
 - **Ruta**: `/apps/api/src/modules/users/users.repository.ts`
 - **Propósito**: Capa de persistencia para el modelo `User`. Encapsula la normalización de correos electrónicos (`normalizeEmail`), la proyección segura (`toSafeUser`), el borrado lógico (`softDelete`) y las consultas tipadas de Prisma.
 
+### `src/modules/auth/auth.service.ts`
+- **Ruta**: `/apps/api/src/modules/auth/auth.service.ts`
+- **Propósito**: Lógica de negocio de autenticación: registro con prevención de escalada de privilegios, login anti-enumeración de usuarios, emisión de tokens y renovación.
+
+### `src/modules/auth/auth.controller.ts`
+- **Ruta**: `/apps/api/src/modules/auth/auth.controller.ts`
+- **Propósito**: Controladores HTTP para `/register`, `/login`, `/logout` y `/refresh`.
+
+### `src/modules/auth/auth.routes.ts`
+- **Ruta**: `/apps/api/src/modules/auth/auth.routes.ts`
+- **Propósito**: Enrutador con vinculación de validadores Zod, limitadores de tasa y controladores de autenticación.
+
 ### `src/routes/v1.routes.ts`
 - **Ruta**: `/apps/api/src/routes/v1.routes.ts`
-- **Propósito**: Enrutador raíz para la versión 1 de la API (`/api/v1`). Agrupa todos los submódulos.
+- **Propósito**: Enrutador raíz para la versión 1 de la API (`/api/v1`). Agrupa submódulos de `/health` y `/auth`.
 
-### `src/app.ts`
-- **Ruta**: `/apps/api/src/app.ts`
-- **Propósito**: Inicialización de la aplicación Express, registro de Helmet, CORS, parser JSON, montaje de rutas y manejadores de error.
-
-### `src/server.ts`
-- **Ruta**: `/apps/api/src/server.ts`
-- **Propósito**: Inicializa el servidor HTTP escuchando en el puerto configurado. Realiza la comprobación inicial de la BD y gestiona el apagado limpio (`Graceful Shutdown`).
+### `src/app.ts` y `src/server.ts`
+- **Rutas**: `/apps/api/src/app.ts`, `src/server.ts`
+- **Propósito**: Definición de la aplicación Express y arranque del servidor HTTP con manejo de señales de apagado limpio.
 
 ### `tests/health.test.ts`
 - **Ruta**: `/apps/api/tests/health.test.ts`
-- **Propósito**: Suite de pruebas automatizadas con Supertest para verificar el endpoint `/api/v1/health` y el manejo de 404.
+- **Propósito**: Pruebas de integración del health check y rutas 404.
 
 ### `tests/user-persistence.test.ts`
 - **Ruta**: `/apps/api/tests/user-persistence.test.ts`
-- **Propósito**: Suite de pruebas de persistencia sobre PostgreSQL que valida:
-  1. Generación de identificador UUIDv4 y valores predeterminados.
-  2. Restricción estricta de correo único (código `P2002`).
-  3. Normalización automática de emails (minúsculas y trim).
-  4. Borrado lógico (`softDelete`) manteniendo la integridad de filas.
-  5. Actualización segura de campos de perfil.
-  6. Ausencia de `passwordHash` en DTOs seguros.
+- **Propósito**: Pruebas de persistencia y restricciones del modelo `User` en PostgreSQL (UUID, unique constraint, soft delete, normalización).
+
+### `tests/auth.test.ts`
+- **Ruta**: `/apps/api/tests/auth.test.ts`
+- **Propósito**: Suite de pruebas completa del flujo de autenticación (13 tests): registro exitoso, unicidad de correo (409), contraseñas débiles (400), prevención de escalada a ADMIN, login exitoso con correo en mayúsculas/espacios, credenciales erróneas (401), cierre de sesión protegido y renovación de tokens.
 
 ---
 
