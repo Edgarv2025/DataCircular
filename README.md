@@ -78,10 +78,14 @@ npm run db:generate
 
 ## 7. Ejecución de Pruebas Automatizadas
 
-Para ejecutar las pruebas del backend con Vitest y Supertest:
+El proyecto cuenta con pruebas automáticas extremo a extremo tanto para el backend como para los flujos móviles de la Fase 5:
 
 ```bash
+# Pruebas del backend (persistencia PostgreSQL, auth, CRUD usuarios, salud)
 npm run test:api
+
+# Pruebas de integración de la app móvil (registro, login, persistencia, perfil, logout, soft-delete)
+npm run test:mobile
 ```
 
 ---
@@ -93,17 +97,50 @@ Modo desarrollo con recarga en caliente:
 npm run dev:api
 ```
 
+O modo servidor en producción/distribución:
+```bash
+npm run start:api
+```
+
 El servidor estará escuchando en:
-- API Base: `http://localhost:3000/api/v1`
+- Consola de Verificación Interactiva: `http://localhost:3000/`
 - Endpoint de Salud: `http://localhost:3000/api/v1/health`
+- API Base: `http://localhost:3000/api/v1`
 
 ---
 
-## 9. Inicio de la Aplicación Móvil (Fase 5)
+## 9. Inicio y Visualización de la Aplicación Móvil (Fase 5)
 
+La aplicación móvil de DATA_CIRCULAR está construida con **React Native**, **Expo SDK 52** y **Expo Router**, conectada en vivo con el backend de Bogotá D.C. Puedes ejecutarla de tres maneras:
+
+### Opción A: En el Navegador Web de tu PC (Recomendada para pruebas rápidas)
+Abre una terminal en VS Code y ejecuta:
 ```bash
-npm --workspace=apps/mobile run start
+npm run mobile:web
 ```
+Se abrirá automáticamente en tu navegador predeterminado (o en `http://localhost:8081`). En el navegador puedes abrir las herramientas de desarrollador (`F12`), activar la vista de emulación de dispositivo móvil (icono de tablet/celular) y probar todos los flujos interactivos.
+
+### Opción B: En tu Teléfono Celular Físico (Android o iPhone con Expo Go)
+1. Instala la app gratuita **Expo Go** desde Google Play Store (Android) o App Store (iPhone).
+2. Asegúrate de que tu celular y tu PC estén conectados a la **misma red Wi-Fi**.
+3. En `apps/mobile/.env`, define la IP local de tu computador:
+   ```env
+   EXPO_PUBLIC_API_URL=http://192.168.1.X:3000/api/v1
+   ```
+4. En la terminal de VS Code ejecuta:
+   ```bash
+   npm run dev:mobile
+   ```
+5. Escanea el **código QR** generado en la terminal:
+   - En Android: desde la app Expo Go ("Scan QR Code").
+   - En iPhone: desde la app Cámara nativa.
+
+### Opción C: En Emulador de Android Studio
+Si tienes Android Studio instalado y configurado con un AVD (Android Virtual Device):
+```bash
+npm run mobile:android
+```
+*(El emulador se comunicará automáticamente con el backend en `http://10.0.2.2:3000/api/v1`)*.
 
 ---
 

@@ -29,3 +29,14 @@
   5. **Normativa de Materiales**: Categorías alineadas con la Resolución 2184 de 2019 del Ministerio de Ambiente y Desarrollo Sostenible de Colombia (Plásticos, Metales, Papel/Cartón, Vidrio, RAEE, Textiles, Orgánicos).
   6. **Marco Legal de Privacidad**: Ley Estatutaria 1581 de 2012 de Protección de Datos Personales (Habeas Data) y Decreto 1377 de 2013 de Colombia.
 - **Consecuencias**: Toda la interfaz móvil, contratos de datos, validaciones y lógica logística responden con precisión al contexto operativo de la Fundación IMARA en Bogotá.
+
+## ADR-005: Arquitectura de la Interfaz Móvil (Expo SDK 52, Expo Router y SecureStore)
+- **Fecha**: 2026-09-28
+- **Contexto**: Implementación de la Fase 5 para proporcionar la primera versión funcional de la interfaz móvil para la Fundación IMARA en Bogotá D.C.
+- **Decisión**:
+  1. **Enrutamiento y Navegación Protegida**: Uso de **Expo Router v4** con grupos de rutas organizados: `app/index.tsx` (Bienvenida/Onboarding), `app/(auth)/` (Registro e Inicio de Sesión) y `app/(app)/` (Perfil protegido y Edición de Perfil con guardia de sesión activa).
+  2. **Persistencia Segura de Credenciales**: Uso de `expo-secure-store` (Keychain en iOS / Keystore en Android con hardware backing) y almacenamiento seguro en web. NUNCA se almacenan contraseñas en almacenamiento persistente; solo tokens JWT de acceso y refresco.
+  3. **Comunicación en Vivo con Backend**: El cliente `apiFetch` realiza peticiones HTTP reales contra `http://localhost:3000/api/v1` o la IP de red local del dispositivo. Se eliminó cualquier mock de memoria en login o registro.
+  4. **Configuración de Entorno por Plataforma**: Detección automática en `Config.apiUrl`: `localhost` en web/iOS, `10.0.2.2` en emulador Android, o `EXPO_PUBLIC_API_URL` para pruebas en dispositivo móvil físico mediante Expo Go.
+  5. **Localización Bogotá D.C.**: Inclusión de selector de las 20 localidades oficiales de Bogotá, prefijo telefónico `+57`, moneda COP y advertencia de tratamiento de datos personales conforme a la Ley 1581 de 2012.
+- **Consecuencias**: Aplicación móvil 100% interoperable con el backend en PostgreSQL, verificada extremo a extremo con pruebas automatizadas (`npm run test:mobile`).

@@ -12,9 +12,14 @@
     "build:api": "npm --workspace=apps/api run build",
     "start:api": "npm --workspace=apps/api run start",
     "test:api": "npm --workspace=apps/api run test",
+    "test:mobile": "npm --workspace=apps/mobile run test:flow",
     "db:migrate": "npm --workspace=apps/api run db:migrate",
     "db:generate": "npm --workspace=apps/api run db:generate",
-    "db:studio": "npm --workspace=apps/api run db:studio"
+    "db:studio": "npm --workspace=apps/api run db:studio",
+    "dev:mobile": "npm --workspace=apps/mobile run start",
+    "mobile:web": "npm --workspace=apps/mobile run web",
+    "mobile:android": "npm --workspace=apps/mobile run android",
+    "mobile:ios": "npm --workspace=apps/mobile run ios"
   },
   "keywords": [
     "circular-economy",
