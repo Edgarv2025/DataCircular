@@ -17,7 +17,6 @@
     "db:generate": "npm --workspace=apps/api run db:generate",
     "db:studio": "npm --workspace=apps/api run db:studio",
     "dev:mobile": "npm --workspace=apps/mobile run start",
-    "mobile:tunnel": "npm --workspace=apps/mobile run start:tunnel",
     "mobile:web": "npm --workspace=apps/mobile run web",
     "mobile:android": "npm --workspace=apps/mobile run android",
     "mobile:ios": "npm --workspace=apps/mobile run ios"
