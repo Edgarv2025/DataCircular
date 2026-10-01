@@ -125,12 +125,15 @@ export interface HealthCheckData {
 
 export type UserStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
 export type UserRole = 'USER' | 'ADMIN';
+export const USER_TYPES = ['GENERATOR', 'RECYCLER', 'TRANSPORTER', 'TRANSFORMER'] as const;
+export type UserType = (typeof USER_TYPES)[number];
 
 export interface SafeUserDto {
   id: string;
   fullName: string;
   email: string;
   phone: string | null;
+  userType: UserType;
   status: UserStatus;
   role: UserRole;
   createdAt: string;
@@ -142,6 +145,7 @@ export interface PublicUserDto {
   id: string;
   fullName: string;
   role: UserRole;
+  userType: UserType;
   createdAt: string;
 }
 
@@ -149,6 +153,7 @@ export interface CreateUserInput {
   fullName: string;
   email: string;
   phone?: string | null;
+  userType: UserType;
   passwordHash: string;
   role?: UserRole;
 }
@@ -161,6 +166,7 @@ export interface UpdateUserInput {
 export interface AdminUpdateUserInput {
   fullName?: string;
   phone?: string | null;
+  userType?: UserType;
   status?: UserStatus;
   role?: UserRole;
 }
@@ -197,6 +203,10 @@ export const registerSchema = z.object({
     .max(30, 'El teléfono no puede exceder 30 caracteres')
     .optional()
     .nullable(),
+  userType: z.enum(USER_TYPES, {
+    required_error: 'El tipo de usuario es requerido',
+    invalid_type_error: 'Selecciona un tipo de usuario válido',
+  }),
 });
 
 export type RegisterDto = z.infer<typeof registerSchema>;
@@ -269,6 +279,13 @@ export const adminUpdateUserSchema = z.object({
   role: z
     .enum(['USER', 'ADMIN'] as const)
     .optional(),
+  userType: z.enum(USER_TYPES).optional(),
 });
 
 export type AdminUpdateUserDto = z.infer<typeof adminUpdateUserSchema>;
+
+export const adminCreateUserSchema = registerSchema.extend({
+  role: z.enum(['USER', 'ADMIN'] as const).optional(),
+});
+
+export type AdminCreateUserDto = z.infer<typeof adminCreateUserSchema>;

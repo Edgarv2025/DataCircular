@@ -1,5 +1,10 @@
 import { apiFetch } from './client';
-import { SafeUserDto, UpdateProfileDto } from '@data-circular/shared';
+import {
+  AdminCreateUserDto,
+  AdminUpdateUserDto,
+  SafeUserDto,
+  UpdateProfileDto,
+} from '@data-circular/shared';
 
 export const UsersApi = {
   /**
@@ -24,9 +29,31 @@ export const UsersApi = {
   /**
    * Desactivación lógica (soft-delete) de la propia cuenta del usuario.
    */
-  async deleteMe(): Promise<{ success: boolean; message: string }> {
-    return apiFetch<{ success: boolean; message: string }>('/users/me', {
+  async deleteMe(): Promise<SafeUserDto> {
+    return apiFetch<SafeUserDto>('/users/me', {
       method: 'DELETE',
     });
+  },
+
+  async listAll(): Promise<SafeUserDto[]> {
+    return apiFetch<SafeUserDto[]>('/users', { method: 'GET' });
+  },
+
+  async adminCreate(dto: AdminCreateUserDto): Promise<SafeUserDto> {
+    return apiFetch<SafeUserDto>('/users', {
+      method: 'POST',
+      body: JSON.stringify(dto),
+    });
+  },
+
+  async adminUpdate(id: string, dto: AdminUpdateUserDto): Promise<SafeUserDto> {
+    return apiFetch<SafeUserDto>(`/users/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(dto),
+    });
+  },
+
+  async adminDelete(id: string): Promise<SafeUserDto> {
+    return apiFetch<SafeUserDto>(`/users/${id}`, { method: 'DELETE' });
   },
 };

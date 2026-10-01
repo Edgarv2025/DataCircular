@@ -14,6 +14,7 @@ async function main() {
     fullName: `Reciclador Suba ${timestamp}`,
     email: `reciclador.suba.${timestamp}@imara.org.co`,
     password: 'Password123!@#',
+    userType: 'RECYCLER' as const,
     phone: '+57 312 9876543',
   };
 
@@ -23,6 +24,7 @@ async function main() {
   console.log('   ✓ Usuario ID:', regResult.user.id);
   console.log('   ✓ Nombre:', regResult.user.fullName);
   console.log('   ✓ Correo:', regResult.user.email);
+  console.log('   ✓ Tipo de usuario:', regResult.user.userType);
   console.log('   ✓ Rol asignado por defecto:', regResult.user.role);
   console.log('   ✓ Token JWT emitido:', regResult.tokens.accessToken ? 'PRESENTE' : 'AUSENTE');
 
@@ -83,7 +85,10 @@ async function main() {
 
   console.log('\n7. [DESACTIVACIÓN LÓGICA / SOFT DELETE] Desactivando cuenta (DELETE /users/me)...');
   const deleteResult = await UsersApi.deleteMe();
-  console.log('   ✓ Respuesta de desactivación:', deleteResult.message);
+  console.log('   ✓ Cuenta desactivada:', deleteResult.status, Boolean(deleteResult.deletedAt));
+  if (deleteResult.status !== 'INACTIVE' || !deleteResult.deletedAt) {
+    throw new Error('La respuesta no confirma la desactivación lógica.');
+  }
   await StorageService.clearSession();
 
   console.log('\n8. [VERIFICACIÓN DE SEGURIDAD] Intentando iniciar sesión con cuenta desactivada...');

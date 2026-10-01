@@ -59,8 +59,7 @@ export default function LoginScreen() {
       });
 
       if (result.success) {
-        // Redirigir a pantalla de perfil protegida
-        router.replace('/(app)/profile');
+        router.replace(result.user?.role === 'ADMIN' ? '/(app)/users' : '/(app)/profile');
       } else {
         setErrorMessage(result.error || 'Credenciales inválidas o cuenta no encontrada.');
       }

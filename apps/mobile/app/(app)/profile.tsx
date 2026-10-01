@@ -217,6 +217,14 @@ export default function ProfileScreen() {
 
       {/* Acciones del Perfil */}
       <View style={styles.actionsContainer}>
+        {user?.role === 'ADMIN' ? (
+          <Button
+            title="Administrar Usuarios"
+            onPress={() => router.push('/(app)/users')}
+            variant="secondary"
+          />
+        ) : null}
+
         <Button
           title="✏️ Editar Perfil"
           onPress={() => router.push('/(app)/edit-profile')}

@@ -14,3 +14,8 @@
   - `GET /api/v1/health` responde con 200 y confirma `healthy` + base de datos `connected`.
   - Verifica que no exista ninguna fuga de credenciales en el JSON de respuesta.
   - Verifica que las rutas no existentes respondan con 404 estructurado.
+
+## 3. Usuarios y Administración
+- El registro exige y persiste `userType` (`GENERATOR`, `RECYCLER`, `TRANSPORTER` o `TRANSFORMER`).
+- El CRUD administrativo verifica listado, creación, actualización y desactivación lógica de cuentas.
+- Las rutas administrativas deben permitir el rol `ADMIN` y responder `403 FORBIDDEN` para `USER`.

@@ -50,6 +50,7 @@ export class AuthService {
       fullName: input.fullName,
       email: normalizedEmail,
       phone: input.phone,
+      userType: input.userType,
       passwordHash,
       role: 'USER',
     });

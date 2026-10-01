@@ -16,7 +16,14 @@ import { Button } from '../../src/components/Button';
 import { Card } from '../../src/components/Card';
 import { ErrorBanner } from '../../src/components/ErrorBanner';
 import { LocalityPicker } from '../../src/components/LocalityPicker';
-import { PASSWORD_REGEX } from '@data-circular/shared';
+import { PASSWORD_REGEX, UserType, USER_TYPES } from '@data-circular/shared';
+
+const USER_TYPE_OPTIONS: { value: UserType; label: string; detail: string }[] = [
+  { value: 'GENERATOR', label: 'Generador', detail: 'Ofrezco materiales' },
+  { value: 'RECYCLER', label: 'Reciclador', detail: 'Recupero materiales' },
+  { value: 'TRANSPORTER', label: 'Transportador', detail: 'Movilizo materiales' },
+  { value: 'TRANSFORMER', label: 'Transformador', detail: 'Aprovecho materiales' },
+];
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -25,6 +32,7 @@ export default function RegisterScreen() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [userType, setUserType] = useState<UserType | null>(null);
   const [selectedLocality, setSelectedLocality] = useState('Chapinero');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -57,6 +65,10 @@ export default function RegisterScreen() {
       if (cleanDigits.length < 10) {
         errors.phone = 'Ingresa un celular válido de Colombia (10 dígitos)';
       }
+    }
+
+    if (!userType || !USER_TYPES.includes(userType)) {
+      errors.userType = 'Selecciona el tipo de usuario';
     }
 
     // Localidad
@@ -104,6 +116,7 @@ export default function RegisterScreen() {
         email: email.trim().toLowerCase(),
         password,
         phone: normalizedPhone,
+        userType: userType!,
       });
 
       if (result.success) {
@@ -179,6 +192,33 @@ export default function RegisterScreen() {
             helperText="Número móvil para coordinación de recolección en Bogotá"
             error={fieldErrors.phone}
           />
+
+          <View style={styles.userTypeContainer}>
+            <Text style={styles.userTypeLabel}>Tipo de usuario *</Text>
+            <View style={styles.userTypeOptions}>
+              {USER_TYPE_OPTIONS.map((option) => {
+                const selected = userType === option.value;
+                return (
+                  <TouchableOpacity
+                    key={option.value}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: selected }}
+                    onPress={() => {
+                      setUserType(option.value);
+                      if (fieldErrors.userType) setFieldErrors({ ...fieldErrors, userType: '' });
+                    }}
+                    style={[styles.userTypeOption, selected && styles.userTypeOptionSelected]}
+                  >
+                    <Text style={[styles.userTypeOptionTitle, selected && styles.userTypeOptionTitleSelected]}>
+                      {option.label}
+                    </Text>
+                    <Text style={styles.userTypeOptionDetail}>{option.detail}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            {fieldErrors.userType ? <Text style={styles.userTypeError}>{fieldErrors.userType}</Text> : null}
+          </View>
 
           <LocalityPicker
             selectedLocality={selectedLocality}
@@ -290,6 +330,54 @@ const styles = StyleSheet.create({
   formCard: {
     marginTop: 8,
     padding: 20,
+  },
+  userTypeContainer: {
+    marginVertical: 6,
+  },
+  userTypeLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.text,
+    marginBottom: 6,
+  },
+  userTypeOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  userTypeOption: {
+    width: '48%',
+    minHeight: 70,
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 8,
+    backgroundColor: Colors.inputBg,
+  },
+  userTypeOptionSelected: {
+    borderColor: Colors.primary,
+    borderWidth: 2,
+    backgroundColor: Colors.accentLight,
+  },
+  userTypeOptionTitle: {
+    color: Colors.text,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  userTypeOptionTitleSelected: {
+    color: Colors.primaryDark,
+  },
+  userTypeOptionDetail: {
+    color: Colors.textMuted,
+    fontSize: 11,
+    marginTop: 3,
+  },
+  userTypeError: {
+    color: Colors.danger,
+    fontSize: 12,
+    marginTop: 4,
   },
   habeasDataBox: {
     backgroundColor: '#F0F5F2',

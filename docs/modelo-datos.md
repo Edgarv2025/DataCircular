@@ -25,11 +25,19 @@ enum UserRole {
   ADMIN
 }
 
+enum UserType {
+  GENERATOR
+  RECYCLER
+  TRANSPORTER
+  TRANSFORMER
+}
+
 model User {
   id           String      @id @default(uuid()) @db.Uuid
   fullName     String      @map("full_name") @db.VarChar(150)
   email        String      @unique @db.VarChar(255)
   phone        String?     @db.VarChar(30)
+  userType     UserType    @default(GENERATOR) @map("user_type")
   passwordHash String      @map("password_hash") @db.VarChar(255)
   status       UserStatus  @default(ACTIVE)
   role         UserRole    @default(USER)
@@ -51,6 +59,7 @@ model User {
 | `full_name` | `VARCHAR(150)` | NOT NULL | - | Nombre y apellidos del usuario |
 | `email` | `VARCHAR(255)` | UNIQUE, NOT NULL | - | Correo normalizado (minúsculas, trim) |
 | `phone` | `VARCHAR(30)` | NULL | NULL | Teléfono móvil o de contacto |
+| `user_type` | `UserType` (ENUM) | NOT NULL | `'GENERATOR'` | Participante: generador, reciclador, transportador o transformador |
 | `password_hash` | `VARCHAR(255)` | NOT NULL | - | Hash criptográfico seguro (Argon2id) |
 | `status` | `UserStatus` (ENUM) | NOT NULL | `'ACTIVE'` | Estado: `ACTIVE`, `INACTIVE`, `SUSPENDED` |
 | `role` | `UserRole` (ENUM) | NOT NULL | `'USER'` | Rol de acceso: `USER`, `ADMIN` |
@@ -84,3 +93,4 @@ model User {
 | Migración | Fecha | Descripción |
 | :--- | :--- | :--- |
 | `20260927180227_init_user_model` | 2026-09-27 | Creación de enums `UserStatus`, `UserRole`, tabla `users` e índices correspondientes. |
+| `20261001120000_add_user_type` | 2026-10-01 | Agrega `UserType` y `user_type`, con valor por defecto compatible para cuentas existentes. |

@@ -3,11 +3,54 @@ import {
   SafeUserDto,
   PublicUserDto,
   UpdateProfileDto,
+  AdminCreateUserDto,
   AdminUpdateUserDto,
 } from '@data-circular/shared';
 import { AuthError } from '../auth/auth.service';
+import { hashPassword } from '../../utils/hash';
 
 export class UsersService {
+  async listUsers(): Promise<SafeUserDto[]> {
+    return usersRepository.listAll();
+  }
+
+  async adminCreateUser(input: AdminCreateUserDto): Promise<SafeUserDto> {
+    const email = input.email.trim().toLowerCase();
+    const existing = await usersRepository.findSafeByEmail(email, true);
+    if (existing) {
+      throw new AuthError(
+        'EMAIL_ALREADY_REGISTERED',
+        'El correo electrónico ya se encuentra registrado en el sistema',
+        409
+      );
+    }
+
+    return usersRepository.create({
+      fullName: input.fullName,
+      email,
+      phone: input.phone,
+      userType: input.userType,
+      passwordHash: await hashPassword(input.password),
+      role: input.role,
+    });
+  }
+
+  async adminDeleteUser(actorId: string, targetUserId: string): Promise<SafeUserDto> {
+    if (actorId === targetUserId) {
+      throw new AuthError('CANNOT_DELETE_SELF', 'No puedes desactivar tu propia cuenta desde esta pantalla', 400);
+    }
+
+    const user = await usersRepository.findById(targetUserId, true);
+    if (!user) {
+      throw new AuthError('USER_NOT_FOUND', 'Usuario objetivo no encontrado', 404);
+    }
+    if (user.deletedAt) {
+      return user;
+    }
+
+    return usersRepository.softDelete(targetUserId);
+  }
+
   /**
    * Consulta el perfil completo del usuario autenticado (SafeUserDto).
    */

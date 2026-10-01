@@ -1,0 +1,5 @@
+-- CreateEnum
+CREATE TYPE "UserType" AS ENUM ('GENERATOR', 'RECYCLER', 'TRANSPORTER', 'TRANSFORMER');
+
+-- AlterTable
+ALTER TABLE "users" ADD COLUMN "user_type" "UserType" NOT NULL DEFAULT 'GENERATOR';

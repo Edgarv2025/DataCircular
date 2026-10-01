@@ -48,9 +48,12 @@ Registra un nuevo usuario en la plataforma.
   "fullName": "Carlos Mendoza",
   "email": "carlos.mendoza@fundacionimara.org",
   "password": "Password123!@#",
-  "phone": "+57 300 123 4567"
+  "phone": "+57 300 123 4567",
+  "userType": "RECYCLER"
 }
 ```
+
+`userType` es obligatorio y acepta `GENERATOR`, `RECYCLER`, `TRANSPORTER` o `TRANSFORMER`. El rol de acceso no se puede elegir en el registro público: siempre se asigna `USER`.
 
 #### Respuesta Exitosa (201 Created)
 ```json
@@ -63,6 +66,7 @@ Registra un nuevo usuario en la plataforma.
       "fullName": "Carlos Mendoza",
       "email": "carlos.mendoza@fundacionimara.org",
       "phone": "+57 300 123 4567",
+      "userType": "RECYCLER",
       "status": "ACTIVE",
       "role": "USER",
       "createdAt": "2026-09-27T18:05:00.000Z",
@@ -116,6 +120,7 @@ Consulta el perfil completo seguro del usuario actualmente autenticado.
     "fullName": "Carlos Mendoza",
     "email": "carlos.mendoza@fundacionimara.org",
     "phone": "+57 300 123 4567",
+    "userType": "RECYCLER",
     "status": "ACTIVE",
     "role": "USER",
     "createdAt": "2026-09-27T18:05:00.000Z",
@@ -181,6 +186,7 @@ Consulta el perfil público de otro usuario en el marketplace.
     "id": "550e8400-e29b-41d4-a716-446655440000",
     "fullName": "Carlos Mendoza",
     "role": "USER",
+    "userType": "RECYCLER",
     "createdAt": "2026-09-27T18:05:00.000Z"
   },
   "timestamp": "2026-09-27T19:35:00.000Z"
@@ -192,8 +198,16 @@ Consulta el perfil público de otro usuario en el marketplace.
 ### `PATCH /api/v1/users/:id`
 Modifica campos de un usuario por parte de un Administrador.
 - **Acceso**: Exclusivo para administradores (`Authorization: Bearer <token>` con rol `ADMIN`).
-- **Permite modificar**: `fullName`, `phone`, `status` (`ACTIVE`, `INACTIVE`, `SUSPENDED`) y `role` (`USER`, `ADMIN`).
+- **Permite modificar**: `fullName`, `phone`, `userType`, `status` (`ACTIVE`, `INACTIVE`, `SUSPENDED`) y `role` (`USER`, `ADMIN`). Reactivar una cuenta restablece `deletedAt` a `null`.
 - **Respuesta de rechazo para usuarios no administradores**: `403 FORBIDDEN`.
+
+### CRUD administrativo
+Las siguientes rutas son exclusivas de `ADMIN` y devuelven datos seguros (`SafeUserDto`, sin `passwordHash`):
+
+- `GET /api/v1/users`: lista todas las cuentas, incluidas las desactivadas, para su administración.
+- `POST /api/v1/users`: crea una cuenta. Recibe los campos de registro, `userType` obligatorio y `role` opcional (`USER` por defecto); las contraseñas se guardan con Argon2id.
+- `PATCH /api/v1/users/:id`: edita nombre, teléfono, tipo, rol y estado.
+- `DELETE /api/v1/users/:id`: desactiva lógicamente la cuenta (`INACTIVE` y `deletedAt`). El administrador no puede desactivar su propia cuenta desde esta ruta.
 
 ---
 

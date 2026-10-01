@@ -59,6 +59,13 @@ export default function AppLayout() {
           headerShown: true,
         }}
       />
+      <Stack.Screen
+        name="users"
+        options={{
+          title: 'Administrar Usuarios',
+          headerShown: true,
+        }}
+      />
     </Stack>
   );
 }

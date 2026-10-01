@@ -10,7 +10,7 @@ interface AuthContextType {
   token: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (credentials: LoginDto) => Promise<{ success: boolean; error?: string }>;
+  login: (credentials: LoginDto) => Promise<{ success: boolean; error?: string; user?: SafeUserDto }>;
   register: (data: RegisterDto) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   updateProfile: (data: UpdateProfileDto) => Promise<{ success: boolean; error?: string; user?: SafeUserDto }>;
@@ -62,7 +62,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     bootstrap();
   }, []);
 
-  const login = async (credentials: LoginDto): Promise<{ success: boolean; error?: string }> => {
+  const login = async (
+    credentials: LoginDto
+  ): Promise<{ success: boolean; error?: string; user?: SafeUserDto }> => {
     try {
       const response: AuthResponseDto = await AuthApi.login(credentials);
       const { user: loggedUser, tokens } = response;
@@ -73,7 +75,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setToken(tokens.accessToken);
       setUser(loggedUser);
 
-      return { success: true };
+      return { success: true, user: loggedUser };
     } catch (err: any) {
       return {
         success: false,

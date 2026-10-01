@@ -3,6 +3,53 @@ import { usersService } from './users.service';
 import { sendSuccess, sendError } from '../../utils/apiResponse';
 import { AuthError } from '../auth/auth.service';
 
+export async function listUsersController(
+  _req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const users = await usersService.listUsers();
+    sendSuccess(res, users, 'Usuarios obtenidos exitosamente');
+  } catch (err: unknown) {
+    next(err);
+  }
+}
+
+export async function adminCreateUserController(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const user = await usersService.adminCreateUser(req.body);
+    sendSuccess(res, user, 'Usuario creado exitosamente', 201);
+  } catch (err: unknown) {
+    if (err instanceof AuthError) {
+      sendError(res, err.code, err.message, err.statusCode);
+      return;
+    }
+    next(err);
+  }
+}
+
+export async function adminDeleteUserController(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const user = await usersService.adminDeleteUser(req.user!.id, req.params.id);
+    sendSuccess(res, user, 'Usuario desactivado exitosamente');
+  } catch (err: unknown) {
+    if (err instanceof AuthError) {
+      sendError(res, err.code, err.message, err.statusCode);
+      return;
+    }
+    next(err);
+  }
+}
+
 export async function getMeController(
   req: Request,
   res: Response,

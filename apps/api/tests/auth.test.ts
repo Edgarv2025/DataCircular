@@ -12,6 +12,7 @@ describe('Módulo de Autenticación API (/api/v1/auth)', () => {
     email: `ana.gomez.${Date.now()}@fundacionimara.org`,
     password: 'Password123!@#',
     phone: '+57 310 987 6543',
+    userType: 'RECYCLER',
   };
 
   beforeAll(async () => {
@@ -49,6 +50,7 @@ describe('Módulo de Autenticación API (/api/v1/auth)', () => {
       expect(user.fullName).toBe(validTestUser.fullName);
       expect(user.email).toBe(validTestUser.email.toLowerCase());
       expect(user.role).toBe('USER');
+      expect(user.userType).toBe(validTestUser.userType);
       expect(user.status).toBe('ACTIVE');
 
       // SEGURIDAD CRÍTICA: passwordHash NO debe estar presente en la respuesta
@@ -71,6 +73,14 @@ describe('Módulo de Autenticación API (/api/v1/auth)', () => {
       expect(res.body).toHaveProperty('success', false);
       expect(res.body.error).toHaveProperty('code', 'EMAIL_ALREADY_REGISTERED');
       expect(res.body.error.message).toContain('ya se encuentra registrado');
+    });
+
+    it('Debe exigir el tipo de usuario durante el registro', async () => {
+      const { userType: _userType, ...missingType } = validTestUser;
+      const res = await request(app).post('/api/v1/auth/register').send(missingType);
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toHaveProperty('code', 'VALIDATION_ERROR');
     });
 
     it('1.3 Debe rechazar el registro con una contraseña débil que no cumple los requisitos (400 Bad Request)', async () => {
@@ -111,6 +121,7 @@ describe('Módulo de Autenticación API (/api/v1/auth)', () => {
         email: `hacker.${Date.now()}@fundacionimara.org`,
         password: 'StrongPassword123!@#',
         role: 'ADMIN', // Intento no autorizado de registrarse como administrador
+        userType: 'GENERATOR',
       };
 
       const res = await request(app)

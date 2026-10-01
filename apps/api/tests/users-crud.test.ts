@@ -25,6 +25,7 @@ describe('CRUD de Usuarios y Perfil (/api/v1/users)', () => {
         email: `normal.${Date.now()}@fundacionimara.org`,
         password: 'Password123!@#',
         phone: '+57 300 111 2233',
+        userType: 'GENERATOR',
       });
     normalUserToken = normalRes.body.data.tokens.accessToken;
     normalUserId = normalRes.body.data.user.id;
@@ -38,6 +39,7 @@ describe('CRUD de Usuarios y Perfil (/api/v1/users)', () => {
         email: `target.${Date.now()}@fundacionimara.org`,
         password: 'Password123!@#',
         phone: '+57 311 444 5566',
+        userType: 'RECYCLER',
       });
     targetUserToken = targetRes.body.data.tokens.accessToken;
     targetUserId = targetRes.body.data.user.id;
@@ -50,6 +52,7 @@ describe('CRUD de Usuarios y Perfil (/api/v1/users)', () => {
         fullName: 'Administrador Sistema',
         email: `admin.${Date.now()}@fundacionimara.org`,
         password: 'AdminPassword123!@#',
+        userType: 'GENERATOR',
       });
     adminUserId = adminRes.body.data.user.id;
     createdUserIds.push(adminUserId);
@@ -92,6 +95,7 @@ describe('CRUD de Usuarios y Perfil (/api/v1/users)', () => {
       expect(res.body.data).toHaveProperty('email');
       expect(res.body.data).toHaveProperty('phone');
       expect(res.body.data).toHaveProperty('role', 'USER');
+      expect(res.body.data).toHaveProperty('userType', 'GENERATOR');
       expect(res.body.data).toHaveProperty('status', 'ACTIVE');
 
       // Seguridad: nunca devolver hash
@@ -188,8 +192,44 @@ describe('CRUD de Usuarios y Perfil (/api/v1/users)', () => {
   });
 
   // ==========================================
-  // 4. PATCH /api/v1/users/:id (Administración)
+  // 4. Administración de usuarios
   // ==========================================
+  describe('GET /api/v1/users', () => {
+    it('permite a ADMIN listar usuarios y lo niega a USER', async () => {
+      const adminRes = await request(app)
+        .get('/api/v1/users')
+        .set('Authorization', `Bearer ${adminUserToken}`);
+      expect(adminRes.status).toBe(200);
+      expect(adminRes.body.data.some((item: { id: string }) => item.id === targetUserId)).toBe(true);
+
+      const userRes = await request(app)
+        .get('/api/v1/users')
+        .set('Authorization', `Bearer ${normalUserToken}`);
+      expect(userRes.status).toBe(403);
+    });
+  });
+
+  describe('POST /api/v1/users', () => {
+    it('permite a ADMIN crear un usuario con tipo seleccionado', async () => {
+      const res = await request(app)
+        .post('/api/v1/users')
+        .set('Authorization', `Bearer ${adminUserToken}`)
+        .send({
+          fullName: 'Transportador de Prueba',
+          email: `transportador.${Date.now()}@fundacionimara.org`,
+          password: 'Transportador123!@#',
+          userType: 'TRANSPORTER',
+          role: 'USER',
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.data.userType).toBe('TRANSPORTER');
+      expect(res.body.data.role).toBe('USER');
+      expect(res.body.data).not.toHaveProperty('passwordHash');
+      createdUserIds.push(res.body.data.id);
+    });
+  });
+
   describe('PATCH /api/v1/users/:id', () => {
     it('4.1 Debe rechazar la modificación de otro usuario si el solicitante es USER (403 Forbidden)', async () => {
       const res = await request(app)
@@ -220,6 +260,18 @@ describe('CRUD de Usuarios y Perfil (/api/v1/users)', () => {
     });
   });
 
+  describe('DELETE /api/v1/users/:id', () => {
+    it('permite a ADMIN desactivar una cuenta de forma lógica', async () => {
+      const res = await request(app)
+        .delete(`/api/v1/users/${targetUserId}`)
+        .set('Authorization', `Bearer ${adminUserToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.status).toBe('INACTIVE');
+      expect(res.body.data.deletedAt).not.toBeNull();
+    });
+  });
+
   // ==========================================
   // 5. DELETE /api/v1/users/me (Desactivación)
   // ==========================================
@@ -232,6 +284,7 @@ describe('CRUD de Usuarios y Perfil (/api/v1/users)', () => {
           fullName: 'Usuario Para Desactivar',
           email: `desactivar.${Date.now()}@fundacionimara.org`,
           password: 'Password123!@#',
+          userType: 'GENERATOR',
         });
       const tempToken = tempUserRes.body.data.tokens.accessToken;
       const tempId = tempUserRes.body.data.user.id;

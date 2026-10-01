@@ -26,6 +26,7 @@ export function toSafeUser(user: User): SafeUserDto {
     fullName: user.fullName,
     email: user.email,
     phone: user.phone,
+    userType: user.userType as SafeUserDto['userType'],
     status: user.status as SafeUserDto['status'],
     role: user.role as SafeUserDto['role'],
     createdAt: user.createdAt.toISOString(),
@@ -43,11 +44,20 @@ export function toPublicUser(user: User | SafeUserDto): PublicUserDto {
     id: user.id,
     fullName: user.fullName,
     role: user.role as PublicUserDto['role'],
+    userType: user.userType as PublicUserDto['userType'],
     createdAt: typeof user.createdAt === 'string' ? user.createdAt : user.createdAt.toISOString(),
   };
 }
 
 export class UsersRepository {
+  async listAll(): Promise<SafeUserDto[]> {
+    const users = await prisma.user.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return users.map(toSafeUser);
+  }
+
   /**
    * Crea un nuevo usuario en la base de datos con correo normalizado.
    */
@@ -57,6 +67,7 @@ export class UsersRepository {
         fullName: input.fullName.trim(),
         email: normalizeEmail(input.email),
         phone: input.phone ? input.phone.trim() : null,
+        userType: input.userType,
         passwordHash: input.passwordHash,
         role: (input.role as UserRole) || UserRole.USER,
         status: UserStatus.ACTIVE,
@@ -132,8 +143,10 @@ export class UsersRepository {
       data: {
         ...(input.fullName ? { fullName: input.fullName.trim() } : {}),
         ...(input.phone !== undefined ? { phone: input.phone ? input.phone.trim() : null } : {}),
+        ...(input.userType ? { userType: input.userType } : {}),
         ...(input.status ? { status: input.status as UserStatus } : {}),
         ...(input.role ? { role: input.role as UserRole } : {}),
+        ...(input.status === 'ACTIVE' ? { deletedAt: null } : {}),
       },
     });
 

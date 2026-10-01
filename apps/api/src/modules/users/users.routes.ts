@@ -4,16 +4,30 @@ import {
   updateMeController,
   deleteMeController,
   getUserByIdController,
+  listUsersController,
+  adminCreateUserController,
+  adminDeleteUserController,
   adminUpdateUserController,
 } from './users.controller';
 import { authenticateToken, requireRole } from '../../middleware/auth.middleware';
 import { validateBody } from '../../middleware/validate';
 import {
   updateProfileSchema,
+  adminCreateUserSchema,
   adminUpdateUserSchema,
 } from '@data-circular/shared';
 
 const router = Router();
+
+// Administración de usuarios (exclusivo ADMIN)
+router.get('/', authenticateToken, requireRole('ADMIN'), listUsersController);
+router.post(
+  '/',
+  authenticateToken,
+  requireRole('ADMIN'),
+  validateBody(adminCreateUserSchema),
+  adminCreateUserController
+);
 
 // ==========================================
 // Rutas de Perfil Propio (Usuario Autenticado)
@@ -48,5 +62,7 @@ router.patch(
   validateBody(adminUpdateUserSchema),
   adminUpdateUserController
 );
+
+router.delete('/:id', authenticateToken, requireRole('ADMIN'), adminDeleteUserController);
 
 export { router as usersRouter };
