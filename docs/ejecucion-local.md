@@ -8,11 +8,13 @@ Desde la raíz del repositorio ejecuta:
 npm run dev
 ```
 
-El comando inicia la API en `http://localhost:3000` y Expo en modo LAN, que muestra un QR para Expo Go. El teléfono y el computador deben estar en la misma red Wi-Fi. En la consola de Expo, pulsa `w` para abrir la versión web.
+El comando reutiliza la API saludable en el puerto `3000` o busca uno libre entre `3000` y `3010`. Expo busca un puerto libre entre `8081` y `8090`, evitando prompts por colisiones, y muestra un QR para Expo Go. El teléfono y el computador deben estar en la misma red Wi-Fi. En la consola de Expo, pulsa `w` para abrir la versión web.
 
-Pulsa `Ctrl+C` para detener ambos procesos.
+El puerto seleccionado para la API se comparte automáticamente con la app móvil. Durante desarrollo, CORS permite los orígenes `localhost` y `127.0.0.1` aunque Expo seleccione un puerto distinto.
 
-Si el puerto predeterminado de Expo está ocupado, acepta el puerto alternativo que proponga Expo y usa el QR actualizado. Si la red local bloquea la conexión del teléfono, inicia Expo por túnel desde una segunda terminal:
+Pulsa `Ctrl+C` para detener los procesos iniciados por el comando.
+
+Si la red local bloquea la conexión del teléfono, inicia Expo por túnel desde una segunda terminal:
 
 ```bash
 cd apps/mobile

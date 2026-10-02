@@ -23,11 +23,12 @@ function getApiBaseUrl(): string {
     return process.env.EXPO_PUBLIC_API_URL;
   }
 
+  const apiPort = process.env.EXPO_PUBLIC_API_PORT || '3000';
   const os = getPlatformOS();
 
   // En navegador Web se usa localhost
   if (os === 'web') {
-    return 'http://localhost:3000/api/v1';
+    return `http://localhost:${apiPort}/api/v1`;
   }
 
   // En dispositivo móvil con Expo Go, intentar obtener la IP del computador
@@ -40,7 +41,7 @@ function getApiBaseUrl(): string {
     if (hostUri && typeof hostUri === 'string') {
       const hostIp = hostUri.split(':')[0];
       if (hostIp && hostIp !== 'localhost' && hostIp !== '127.0.0.1') {
-        return `http://${hostIp}:3000/api/v1`;
+        return `http://${hostIp}:${apiPort}/api/v1`;
       }
     }
   } catch {
@@ -49,11 +50,11 @@ function getApiBaseUrl(): string {
 
   if (os === 'android') {
     // Si corre en emulador local de Android Studio
-    return 'http://10.0.2.2:3000/api/v1';
+    return `http://10.0.2.2:${apiPort}/api/v1`;
   }
 
   // Fallback con la IP local Wi-Fi de desarrollo en Bogotá
-  return 'http://192.168.10.11:3000/api/v1';
+  return `http://192.168.10.11:${apiPort}/api/v1`;
 }
 
 export const Config = {

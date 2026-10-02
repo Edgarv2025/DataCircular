@@ -24,7 +24,9 @@ export function createApp(): Application {
       origin: (origin, callback) => {
         // Permitir solicitudes sin origen (como clientes móviles nativos o herramientas de testing)
         if (!origin) return callback(null, true);
-        if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+        const localDevelopmentOrigin =
+          env.NODE_ENV !== 'production' && /^https?:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin);
+        if (allowedOrigins.includes('*') || allowedOrigins.includes(origin) || localDevelopmentOrigin) {
           return callback(null, true);
         }
         return callback(new Error(`Origen ${origin} no permitido por política CORS`));
