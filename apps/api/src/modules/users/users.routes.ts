@@ -7,6 +7,7 @@ import {
   listUsersController,
   adminCreateUserController,
   adminDeleteUserController,
+  adminPermanentlyDeleteUserController,
   adminUpdateUserController,
 } from './users.controller';
 import { authenticateToken, requireRole } from '../../middleware/auth.middleware';
@@ -63,6 +64,12 @@ router.patch(
   adminUpdateUserController
 );
 
+router.delete(
+  '/:id/permanent',
+  authenticateToken,
+  requireRole('ADMIN'),
+  adminPermanentlyDeleteUserController
+);
 router.delete('/:id', authenticateToken, requireRole('ADMIN'), adminDeleteUserController);
 
 export { router as usersRouter };

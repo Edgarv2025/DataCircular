@@ -272,6 +272,29 @@ describe('CRUD de Usuarios y Perfil (/api/v1/users)', () => {
     });
   });
 
+  describe('DELETE /api/v1/users/:id/permanent', () => {
+    it('solo permite a ADMIN borrar la fila y protege la cuenta administradora', async () => {
+      const denied = await request(app)
+        .delete(`/api/v1/users/${targetUserId}/permanent`)
+        .set('Authorization', `Bearer ${normalUserToken}`);
+      expect(denied.status).toBe(403);
+
+      const selfDelete = await request(app)
+        .delete(`/api/v1/users/${adminUserId}/permanent`)
+        .set('Authorization', `Bearer ${adminUserToken}`);
+      expect(selfDelete.status).toBe(400);
+
+      const deleted = await request(app)
+        .delete(`/api/v1/users/${targetUserId}/permanent`)
+        .set('Authorization', `Bearer ${adminUserToken}`);
+      expect(deleted.status).toBe(200);
+      expect(deleted.body.data.id).toBe(targetUserId);
+      expect(await prisma.user.findUnique({ where: { id: targetUserId } })).toBeNull();
+      const targetIndex = createdUserIds.indexOf(targetUserId);
+      if (targetIndex >= 0) createdUserIds.splice(targetIndex, 1);
+    });
+  });
+
   // ==========================================
   // 5. DELETE /api/v1/users/me (Desactivación)
   // ==========================================

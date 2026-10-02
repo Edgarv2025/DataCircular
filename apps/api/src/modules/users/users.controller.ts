@@ -50,6 +50,23 @@ export async function adminDeleteUserController(
   }
 }
 
+export async function adminPermanentlyDeleteUserController(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const result = await usersService.adminPermanentlyDeleteUser(req.user!.id, req.params.id);
+    sendSuccess(res, result, 'Usuario eliminado permanentemente');
+  } catch (err: unknown) {
+    if (err instanceof AuthError) {
+      sendError(res, err.code, err.message, err.statusCode);
+      return;
+    }
+    next(err);
+  }
+}
+
 export async function getMeController(
   req: Request,
   res: Response,

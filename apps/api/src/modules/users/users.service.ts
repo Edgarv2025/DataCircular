@@ -51,6 +51,20 @@ export class UsersService {
     return usersRepository.softDelete(targetUserId);
   }
 
+  async adminPermanentlyDeleteUser(actorId: string, targetUserId: string): Promise<{ id: string }> {
+    if (actorId === targetUserId) {
+      throw new AuthError('CANNOT_DELETE_SELF', 'No puedes eliminar tu propia cuenta', 400);
+    }
+
+    const user = await usersRepository.findById(targetUserId, true);
+    if (!user) {
+      throw new AuthError('USER_NOT_FOUND', 'Usuario objetivo no encontrado', 404);
+    }
+
+    await usersRepository.deletePermanently(targetUserId);
+    return { id: targetUserId };
+  }
+
   /**
    * Consulta el perfil completo del usuario autenticado (SafeUserDto).
    */

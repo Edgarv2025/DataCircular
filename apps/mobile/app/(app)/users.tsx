@@ -158,6 +158,16 @@ export default function UsersScreen() {
     }
   };
 
+  const permanentlyDeleteUser = async (target: SafeUserDto) => {
+    setErrorMessage(null);
+    try {
+      await UsersApi.adminPermanentlyDelete(target.id);
+      await loadUsers();
+    } catch (err: any) {
+      setErrorMessage(err.message || 'No se pudo eliminar el usuario.');
+    }
+  };
+
   const confirmDeactivate = (target: SafeUserDto) => {
     if (user?.id === target.id) {
       setErrorMessage('No puedes desactivar tu propia cuenta desde esta pantalla.');
@@ -172,6 +182,20 @@ export default function UsersScreen() {
     Alert.alert('Desactivar usuario', `¿Desactivar la cuenta de ${target.fullName}?`, [
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Desactivar', style: 'destructive', onPress: () => void deactivateUser(target) },
+    ]);
+  };
+
+  const confirmPermanentDelete = (target: SafeUserDto) => {
+    const message = `Eliminar definitivamente la cuenta de ${target.fullName}? Esta acción no se puede deshacer.`;
+    if (Platform.OS === 'web') {
+      if (window.confirm(message)) {
+        void permanentlyDeleteUser(target);
+      }
+      return;
+    }
+    Alert.alert('Eliminar usuario definitivamente', message, [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Eliminar', style: 'destructive', onPress: () => void permanentlyDeleteUser(target) },
     ]);
   };
 
@@ -240,6 +264,16 @@ export default function UsersScreen() {
                   style={styles.actionButton}
                 >
                   <Text style={styles.deleteAction}>Desactivar</Text>
+                </TouchableOpacity>
+              ) : null}
+              {item.id !== user?.id ? (
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel={`Eliminar definitivamente ${item.fullName}`}
+                  onPress={() => confirmPermanentDelete(item)}
+                  style={styles.actionButton}
+                >
+                  <Text style={styles.deleteAction}>Eliminar</Text>
                 </TouchableOpacity>
               ) : null}
             </View>

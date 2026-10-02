@@ -208,6 +208,7 @@ Las siguientes rutas son exclusivas de `ADMIN` y devuelven datos seguros (`SafeU
 - `POST /api/v1/users`: crea una cuenta. Recibe los campos de registro, `userType` obligatorio y `role` opcional (`USER` por defecto); las contraseñas se guardan con Argon2id.
 - `PATCH /api/v1/users/:id`: edita nombre, teléfono, tipo, rol y estado.
 - `DELETE /api/v1/users/:id`: desactiva lógicamente la cuenta (`INACTIVE` y `deletedAt`). El administrador no puede desactivar su propia cuenta desde esta ruta.
+- `DELETE /api/v1/users/:id/permanent`: elimina físicamente la cuenta. Es irreversible, solo accesible para `ADMIN` y no permite eliminar la propia cuenta administradora.
 
 ---
 

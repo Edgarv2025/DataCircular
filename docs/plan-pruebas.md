@@ -18,4 +18,5 @@
 ## 3. Usuarios y Administración
 - El registro exige y persiste `userType` (`GENERATOR`, `RECYCLER`, `TRANSPORTER` o `TRANSFORMER`).
 - El CRUD administrativo verifica listado, creación, actualización y desactivación lógica de cuentas.
+- La eliminación permanente verifica borrado físico, control de rol `ADMIN` y protección contra autoeliminación.
 - Las rutas administrativas deben permitir el rol `ADMIN` y responder `403 FORBIDDEN` para `USER`.

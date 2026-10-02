@@ -56,4 +56,8 @@ export const UsersApi = {
   async adminDelete(id: string): Promise<SafeUserDto> {
     return apiFetch<SafeUserDto>(`/users/${id}`, { method: 'DELETE' });
   },
+
+  async adminPermanentlyDelete(id: string): Promise<{ id: string }> {
+    return apiFetch<{ id: string }>(`/users/${id}/permanent`, { method: 'DELETE' });
+  },
 };
