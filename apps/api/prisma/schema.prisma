@@ -32,6 +32,11 @@ enum UserType {
   TRANSFORMER
 }
 
+enum DataPolicyAcceptanceStatus {
+  ACCEPTED
+  WITHDRAWN
+}
+
 /// Entidad principal de Usuario
 model User {
   id           String      @id @default(uuid()) @db.Uuid
@@ -45,8 +50,154 @@ model User {
   createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt    DateTime?   @map("deleted_at") @db.Timestamptz(6)
+  dataPolicyAcceptance DataPolicyAcceptance?
+  memberships  OrganizationMember[] @relation("UserMemberships")
+  invitedMembers OrganizationMember[] @relation("InvitedMembers")
 
   @@index([status, deletedAt])
   @@index([email])
   @@map("users")
 }
+
+model DataPolicyAcceptance {
+  id            String                      @id @default(uuid()) @db.Uuid
+  userId        String                      @unique @map("user_id") @db.Uuid
+  acceptedAt    DateTime                    @default(now()) @map("accepted_at") @db.Timestamptz(6)
+  policyVersion String                      @map("policy_version") @db.VarChar(100)
+  policyUrl     String?                     @map("policy_url") @db.Text
+  status        DataPolicyAcceptanceStatus  @default(ACCEPTED)
+  user          User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("data_policy_acceptances")
+}
+
+/// Tipos de organización en la economía circular
+enum OrganizationType {
+  COMPANY      // Empresa comercial
+  ASSOCIATION  // Asociación de recicladores de oficio
+  FOUNDATION   // Fundación sin ánimo de lucro
+  COOPERATIVE  // Cooperativa
+  INSTITUTION  // Entidad pública o institucional
+}
+
+/// Estados operativos de la organización
+enum OrganizationStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+/// Estados del proceso de verificación o certificación institucional
+enum VerificationStatus {
+  UNVERIFIED
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+/// Estados de la membresía de un usuario en una organización
+enum MembershipStatus {
+  ACTIVE
+  INVITED
+  INACTIVE
+}
+
+/// Entidad de Organizaciones y Empresas
+model Organization {
+  id                 String             @id @default(uuid()) @db.Uuid
+  name               String             @db.VarChar(150)
+  legalName          String?            @map("legal_name") @db.VarChar(200)
+  taxId              String?            @unique @map("tax_id") @db.VarChar(50)
+  orgType            OrganizationType   @default(COMPANY) @map("org_type")
+  activityType       UserType           @default(GENERATOR) @map("activity_type")
+  email              String?            @db.VarChar(255)
+  phone              String?            @db.VarChar(30)
+  address            String?            @db.VarChar(255)
+  locality           String?            @db.VarChar(100)
+  city               String             @default("Bogotá D.C.") @db.VarChar(100)
+  status             OrganizationStatus @default(ACTIVE)
+  verificationStatus VerificationStatus @default(UNVERIFIED) @map("verification_status")
+  verifiedAt         DateTime?          @map("verified_at") @db.Timestamptz(6)
+  verificationNotes  String?            @map("verification_notes") @db.Text
+  certificateUrl     String?            @map("certificate_url") @db.Text
+  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt          DateTime?          @map("deleted_at") @db.Timestamptz(6)
+
+  members            OrganizationMember[]
+  roles              Role[]
+
+  @@index([status, deletedAt])
+  @@index([orgType])
+  @@index([locality])
+  @@map("organizations")
+}
+
+/// Roles dentro de las organizaciones (distintos de los roles de plataforma)
+model Role {
+  id             String          @id @default(uuid()) @db.Uuid
+  organizationId String?         @map("organization_id") @db.Uuid
+  name           String          @db.VarChar(50)
+  description    String?         @db.VarChar(255)
+  isSystem       Boolean         @default(false) @map("is_system")
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization   Organization?   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  permissions    RolePermission[]
+  members        OrganizationMember[]
+
+  @@unique([organizationId, name])
+  @@map("roles")
+}
+
+/// Permisos granulares de organización
+model Permission {
+  id          String           @id @default(uuid()) @db.Uuid
+  code        String           @unique @db.VarChar(100)
+  name        String           @db.VarChar(100)
+  description String?          @db.VarChar(255)
+  module      String           @db.VarChar(50)
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  roles       RolePermission[]
+
+  @@map("permissions")
+}
+
+/// Asociación entre Roles y Permisos (Muchos a Muchos)
+model RolePermission {
+  roleId       String     @map("role_id") @db.Uuid
+  permissionId String     @map("permission_id") @db.Uuid
+  assignedAt   DateTime   @default(now()) @map("assigned_at") @db.Timestamptz(6)
+
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+/// Membresía y vinculación de un Usuario con una Organización
+model OrganizationMember {
+  id             String           @id @default(uuid()) @db.Uuid
+  organizationId String           @map("organization_id") @db.Uuid
+  userId         String           @map("user_id") @db.Uuid
+  roleId         String           @map("role_id") @db.Uuid
+  status         MembershipStatus @default(ACTIVE)
+  invitedById    String?          @map("invited_by_id") @db.Uuid
+  joinedAt       DateTime         @default(now()) @map("joined_at") @db.Timestamptz(6)
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User             @relation("UserMemberships", fields: [userId], references: [id], onDelete: Cascade)
+  invitedBy      User?            @relation("InvitedMembers", fields: [invitedById], references: [id], onDelete: SetNull)
+  role           Role             @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+  @@index([organizationId])
+  @@map("organization_members")
+}
+

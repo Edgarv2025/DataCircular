@@ -1,7 +1,11 @@
 import { apiFetch } from './client';
-import { AuthResponseDto, LoginDto, RegisterDto } from '@data-circular/shared';
+import { AuthResponseDto, DataPolicyInfoDto, LoginDto, RegisterDto } from '@data-circular/shared';
 
 export const AuthApi = {
+  async getDataPolicy(): Promise<DataPolicyInfoDto> {
+    return apiFetch<DataPolicyInfoDto>('/auth/data-policy');
+  },
+
   /**
    * Registro de un nuevo usuario en DATA_CIRCULAR.
    * La cuenta se crea con estado ACTIVE y rol USER.

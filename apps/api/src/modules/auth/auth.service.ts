@@ -1,6 +1,7 @@
 import { usersRepository, normalizeEmail, toSafeUser } from '../users/users.repository';
 import { hashPassword, verifyPassword } from '../../utils/hash';
 import { generateTokens, verifyRefreshToken } from '../../utils/jwt';
+import { env } from '../../config/env';
 import {
   RegisterDto,
   LoginDto,
@@ -53,6 +54,9 @@ export class AuthService {
       userType: input.userType,
       passwordHash,
       role: 'USER',
+    }, {
+      policyVersion: env.DATA_POLICY_VERSION,
+      policyUrl: env.DATA_POLICY_URL ?? null,
     });
 
     // Generar tokens de sesión

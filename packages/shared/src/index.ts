@@ -141,6 +141,12 @@ export interface SafeUserDto {
   deletedAt: string | null;
 }
 
+export interface DataPolicyInfoDto {
+  available: boolean;
+  url: string | null;
+  version: string;
+}
+
 export interface PublicUserDto {
   id: string;
   fullName: string;
@@ -207,6 +213,9 @@ export const registerSchema = z.object({
     required_error: 'El tipo de usuario es requerido',
     invalid_type_error: 'Selecciona un tipo de usuario válido',
   }),
+  dataPolicyAccepted: z
+    .boolean({ required_error: 'Debes aceptar el tratamiento de datos personales' })
+    .refine((accepted) => accepted, 'Debes aceptar el tratamiento de datos personales'),
 });
 
 export type RegisterDto = z.infer<typeof registerSchema>;
@@ -284,8 +293,268 @@ export const adminUpdateUserSchema = z.object({
 
 export type AdminUpdateUserDto = z.infer<typeof adminUpdateUserSchema>;
 
-export const adminCreateUserSchema = registerSchema.extend({
+export const adminCreateUserSchema = registerSchema.omit({ dataPolicyAccepted: true }).extend({
   role: z.enum(['USER', 'ADMIN'] as const).optional(),
 });
 
 export type AdminCreateUserDto = z.infer<typeof adminCreateUserSchema>;
+
+// ==========================================
+// Entidades y DTOs de Organizaciones (Fase 7)
+// ==========================================
+
+export const ORGANIZATION_TYPES = [
+  'COMPANY',      // Empresa (S.A.S., S.A., Ltda., etc.)
+  'ASSOCIATION',  // Asociación de recicladores de oficio
+  'FOUNDATION',   // Fundación (ej. Fundación IMARA)
+  'COOPERATIVE',  // Cooperativa de reciclaje y trabajo asociado
+  'INSTITUTION',  // Entidad pública / municipal (ej. UAESP, Alcaldía)
+] as const;
+export type OrganizationType = (typeof ORGANIZATION_TYPES)[number];
+
+export const ORGANIZATION_STATUSES = ['ACTIVE', 'INACTIVE', 'SUSPENDED'] as const;
+export type OrganizationStatus = (typeof ORGANIZATION_STATUSES)[number];
+
+export const VERIFICATION_STATUSES = ['UNVERIFIED', 'PENDING', 'VERIFIED', 'REJECTED'] as const;
+export type VerificationStatus = (typeof VERIFICATION_STATUSES)[number];
+
+export const MEMBERSHIP_STATUSES = ['ACTIVE', 'INVITED', 'INACTIVE'] as const;
+export type MembershipStatus = (typeof MEMBERSHIP_STATUSES)[number];
+
+export const ORG_ROLE_NAMES = ['OWNER', 'ADMIN', 'MEMBER', 'OPERATOR'] as const;
+export type OrgRoleName = (typeof ORG_ROLE_NAMES)[number];
+
+export interface PermissionDto {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  module: string;
+}
+
+export interface RoleDto {
+  id: string;
+  organizationId: string | null;
+  name: string;
+  description: string | null;
+  isSystem: boolean;
+  permissions: PermissionDto[];
+}
+
+export interface OrganizationMemberDto {
+  id: string;
+  organizationId: string;
+  userId: string;
+  roleId: string;
+  status: MembershipStatus;
+  joinedAt: string;
+  user: {
+    id: string;
+    fullName: string;
+    email: string;
+    phone: string | null;
+  };
+  role: {
+    id: string;
+    name: string;
+    description: string | null;
+  };
+}
+
+export interface OrganizationDto {
+  id: string;
+  name: string;
+  legalName: string | null;
+  taxId: string | null;
+  orgType: OrganizationType;
+  activityType: UserType;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  locality: string | null;
+  city: string;
+  status: OrganizationStatus;
+  verificationStatus: VerificationStatus;
+  verifiedAt: string | null;
+  verificationNotes: string | null;
+  certificateUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+  membersCount?: number;
+  userRole?: string; // Rol del usuario autenticado en esta organización
+}
+
+// ==========================================
+// Esquemas de Validación con Zod (Fase 7)
+// ==========================================
+
+export const createOrganizationSchema = z.object({
+  name: z
+    .string({ required_error: 'El nombre comercial es requerido' })
+    .trim()
+    .min(3, 'El nombre debe tener al menos 3 caracteres')
+    .max(150, 'El nombre no puede exceder 150 caracteres'),
+  legalName: z
+    .string()
+    .trim()
+    .min(3, 'La razón social debe tener al menos 3 caracteres')
+    .max(200, 'La razón social no puede exceder 200 caracteres')
+    .optional()
+    .nullable(),
+  taxId: z
+    .string()
+    .trim()
+    .min(5, 'El NIT debe tener al menos 5 caracteres')
+    .max(50, 'El NIT no puede exceder 50 caracteres')
+    .regex(/^[0-9.-]+$/, 'El NIT solo puede contener números, puntos y guiones')
+    .optional()
+    .nullable(),
+  orgType: z.enum(ORGANIZATION_TYPES, {
+    invalid_type_error: 'Tipo de organización inválido',
+  }).default('COMPANY'),
+  activityType: z.enum(USER_TYPES, {
+    invalid_type_error: 'Tipo de actividad circular inválido',
+  }).default('GENERATOR'),
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .email('Correo electrónico corporativo inválido')
+    .optional()
+    .nullable(),
+  phone: z
+    .string()
+    .trim()
+    .max(30, 'El teléfono no puede exceder 30 caracteres')
+    .optional()
+    .nullable(),
+  address: z
+    .string()
+    .trim()
+    .max(255, 'La dirección no puede exceder 255 caracteres')
+    .optional()
+    .nullable(),
+  locality: z
+    .enum(BOGOTA_LOCALITIES, {
+      invalid_type_error: 'Selecciona una localidad oficial de Bogotá válida',
+    })
+    .optional()
+    .nullable(),
+  city: z
+    .string()
+    .trim()
+    .default('Bogotá D.C.'),
+});
+
+export type CreateOrganizationInput = z.infer<typeof createOrganizationSchema>;
+
+export const updateOrganizationSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(3, 'El nombre debe tener al menos 3 caracteres')
+    .max(150, 'El nombre no puede exceder 150 caracteres')
+    .optional(),
+  legalName: z
+    .string()
+    .trim()
+    .min(3, 'La razón social debe tener al menos 3 caracteres')
+    .max(200, 'La razón social no puede exceder 200 caracteres')
+    .optional()
+    .nullable(),
+  taxId: z
+    .string()
+    .trim()
+    .min(5, 'El NIT debe tener al menos 5 caracteres')
+    .max(50, 'El NIT no puede exceder 50 caracteres')
+    .regex(/^[0-9.-]+$/, 'El NIT solo puede contener números, puntos y guiones')
+    .optional()
+    .nullable(),
+  orgType: z.enum(ORGANIZATION_TYPES).optional(),
+  activityType: z.enum(USER_TYPES).optional(),
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .email('Correo electrónico corporativo inválido')
+    .optional()
+    .nullable(),
+  phone: z
+    .string()
+    .trim()
+    .max(30, 'El teléfono no puede exceder 30 caracteres')
+    .optional()
+    .nullable(),
+  address: z
+    .string()
+    .trim()
+    .max(255, 'La dirección no puede exceder 255 caracteres')
+    .optional()
+    .nullable(),
+  locality: z
+    .enum(BOGOTA_LOCALITIES)
+    .optional()
+    .nullable(),
+  city: z
+    .string()
+    .trim()
+    .optional(),
+});
+
+export type UpdateOrganizationInput = z.infer<typeof updateOrganizationSchema>;
+
+export const addMemberSchema = z.object({
+  email: z
+    .string({ required_error: 'El correo electrónico del miembro es requerido' })
+    .trim()
+    .toLowerCase()
+    .email('Formato de correo electrónico inválido'),
+  roleName: z
+    .enum(ORG_ROLE_NAMES, {
+      required_error: 'El rol en la organización es requerido',
+      invalid_type_error: 'Rol de organización inválido (OWNER, ADMIN, MEMBER, OPERATOR)',
+    })
+    .default('MEMBER'),
+});
+
+export type AddMemberInput = z.infer<typeof addMemberSchema>;
+
+export const updateMemberRoleSchema = z.object({
+  roleName: z.enum(ORG_ROLE_NAMES, {
+    required_error: 'El rol en la organización es requerido',
+  }),
+  status: z.enum(MEMBERSHIP_STATUSES).optional(),
+});
+
+export type UpdateMemberRoleInput = z.infer<typeof updateMemberRoleSchema>;
+
+export const requestVerificationSchema = z.object({
+  notes: z
+    .string()
+    .trim()
+    .max(500, 'Las notas de verificación no pueden exceder 500 caracteres')
+    .optional(),
+  certificateUrl: z
+    .string()
+    .trim()
+    .url('Debe ser una URL válida')
+    .optional()
+    .nullable(),
+});
+
+export type RequestVerificationInput = z.infer<typeof requestVerificationSchema>;
+
+export const reviewVerificationSchema = z.object({
+  status: z.enum(['VERIFIED', 'REJECTED'] as const, {
+    required_error: 'El estado de revisión debe ser VERIFIED o REJECTED',
+  }),
+  notes: z
+    .string()
+    .trim()
+    .max(500, 'Las notas no pueden exceder 500 caracteres')
+    .optional(),
+});
+
+export type ReviewVerificationInput = z.infer<typeof reviewVerificationSchema>;
+

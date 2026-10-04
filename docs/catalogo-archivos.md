@@ -120,7 +120,14 @@ Este catálogo describe de manera exhaustiva cada archivo creado en el proyecto,
 
 ### `src/modules/auth/` (service, controller, routes)
 - **Rutas**: `/apps/api/src/modules/auth/auth.service.ts`, `controller.ts`, `routes.ts`
-- **Propósito**: Módulo de autenticación con `/register`, `/login`, `/logout` y `/refresh`.
+- **Propósito**: Módulo de autenticación con `/register`, `/login`, `/logout`, `/refresh` y consulta de política de datos (`/data-policy`).
+
+### `src/modules/organizations/` (Fase 7)
+- **`organizations.seed.ts`**: Sembrador idempotente de roles de sistema (`OWNER`, `ADMIN`, `MEMBER`, `OPERATOR`) y matriz de permisos granulares.
+- **`organizations.repository.ts`**: Capa de persistencia en PostgreSQL con Prisma para empresas, organizaciones, asignación automática de OWNER al creador, gestión de membresías, protección de único propietario y actualización de certificaciones.
+- **`organizations.service.ts`**: Lógica de negocio y reglas de dominio para creación de organizaciones, unicidad de NIT, vinculación de usuarios por correo, autorización interna y validación de certificación.
+- **`organizations.middleware.ts`**: Middlewares `requireOrgMember` y `requireOrgPermission` para control de acceso RBAC a nivel de entidad con bypass para administradores de plataforma.
+- **`organizations.controller.ts` y `organizations.routes.ts`**: Controladores y endpoints REST montados en `/api/v1/organizations` para CRUD de organizaciones, miembros, roles y verificación.
 
 ### `src/modules/dashboard/dashboard.routes.ts`
 - **Ruta**: `/apps/api/src/modules/dashboard/dashboard.routes.ts`
@@ -137,15 +144,17 @@ Este catálogo describe de manera exhaustiva cada archivo creado en el proyecto,
 ### Suites de Pruebas Automatizadas (`apps/api/tests/`)
 - `tests/health.test.ts`: Pruebas de salud y 404.
 - `tests/user-persistence.test.ts`: Pruebas de restricciones en PostgreSQL (UUID, unicidad, soft delete).
-- `tests/auth.test.ts`: 13 pruebas de registro, login, logout y mitigación de fuerza bruta.
-- `tests/users-crud.test.ts`: 9 pruebas del CRUD protegido, privacidad pública, inmutabilidad y permisos de administrador.
+- `tests/auth.test.ts`: 17 pruebas de registro, login, logout y política de datos.
+- `tests/users-crud.test.ts`: 13 pruebas del CRUD protegido, privacidad pública, inmutabilidad y permisos de administrador.
+- `tests/organizations.test.ts`: 23 pruebas de creación de empresas, asignación de OWNER, roles internos, permisos granulares, invitaciones por correo, protección contra eliminación de único propietario y certificación institucional.
+- **Total**: 60 pruebas backend automatizadas (100% pasando).
 
 ---
 
 ## 4. Aplicación Móvil (`apps/mobile/`)
 
 ### Configuración y Metro
-- **`apps/mobile/package.json` y `tsconfig.json`**: Manifiesto de dependencias (Expo SDK 52, React Native 0.76.5, Expo Router v4, Expo SecureStore) y configuración estricta de TypeScript.
+- **`apps/mobile/package.json` y `tsconfig.json`**: Manifiesto de dependencias (Expo SDK 57, React Native 0.86.3, Expo Router y Expo SecureStore) y configuración estricta de TypeScript.
 - **`apps/mobile/app.json`**: Configuración de Expo con nombre de la app `DATA_CIRCULAR`, slug, esquema `datacircular`, modo vertical, splash institucional `#1B4332` y plugin de Expo Router.
 - **`apps/mobile/metro.config.js`**: Configuración de empaquetado Metro adaptada al monorepo npm: vigilancia de la raíz y resolución jerárquica de `node_modules` y `@data-circular/shared`.
 

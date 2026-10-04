@@ -13,6 +13,7 @@ describe('Módulo de Autenticación API (/api/v1/auth)', () => {
     password: 'Password123!@#',
     phone: '+57 310 987 6543',
     userType: 'RECYCLER',
+    dataPolicyAccepted: true,
   };
 
   beforeAll(async () => {
@@ -45,6 +46,8 @@ describe('Módulo de Autenticación API (/api/v1/auth)', () => {
 
       const { user, tokens } = res.body.data;
       registeredUserIds.push(user.id);
+      const policyInfoResponse = await request(app).get('/api/v1/auth/data-policy');
+      const policyInfo = policyInfoResponse.body.data;
 
       // Verificaciones del usuario retornado
       expect(user.fullName).toBe(validTestUser.fullName);
@@ -52,6 +55,12 @@ describe('Módulo de Autenticación API (/api/v1/auth)', () => {
       expect(user.role).toBe('USER');
       expect(user.userType).toBe(validTestUser.userType);
       expect(user.status).toBe('ACTIVE');
+      const acceptance = await prisma.dataPolicyAcceptance.findUnique({ where: { userId: user.id } });
+      expect(acceptance).not.toBeNull();
+      expect(acceptance?.status).toBe('ACCEPTED');
+      expect(acceptance?.acceptedAt).toBeInstanceOf(Date);
+      expect(acceptance?.policyVersion).toBe(policyInfo.version);
+      expect(acceptance?.policyUrl).toBe(policyInfo.url);
 
       // SEGURIDAD CRÍTICA: passwordHash NO debe estar presente en la respuesta
       expect(user).not.toHaveProperty('passwordHash');
@@ -62,6 +71,33 @@ describe('Módulo de Autenticación API (/api/v1/auth)', () => {
       expect(tokens).toHaveProperty('refreshToken');
       expect(typeof tokens.accessToken).toBe('string');
       expect(typeof tokens.refreshToken).toBe('string');
+    });
+
+    it('expone disponibilidad y referencia configuradas sin inventar una URL', async () => {
+      const res = await request(app).get('/api/v1/auth/data-policy');
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.available).toBe(Boolean(res.body.data.url));
+      expect(typeof res.body.data.version).toBe('string');
+      if (!res.body.data.available) expect(res.body.data.url).toBeNull();
+    });
+
+    it('rechaza el registro si no se acepta expresamente la política de datos', async () => {
+      const { dataPolicyAccepted: _accepted, ...withoutConsent } = validTestUser;
+      const res = await request(app).post('/api/v1/auth/register').send(withoutConsent);
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toHaveProperty('code', 'VALIDATION_ERROR');
+      expect(JSON.stringify(res.body.error.details)).toContain('aceptar el tratamiento');
+    });
+
+    it('rechaza el registro si el consentimiento explícito es falso', async () => {
+      const res = await request(app)
+        .post('/api/v1/auth/register')
+        .send({ ...validTestUser, dataPolicyAccepted: false });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toHaveProperty('code', 'VALIDATION_ERROR');
     });
 
     it('1.2 Debe rechazar el registro con un correo electrónico ya existente (409 Conflict)', async () => {
@@ -122,6 +158,7 @@ describe('Módulo de Autenticación API (/api/v1/auth)', () => {
         password: 'StrongPassword123!@#',
         role: 'ADMIN', // Intento no autorizado de registrarse como administrador
         userType: 'GENERATOR',
+        dataPolicyAccepted: true,
       };
 
       const res = await request(app)

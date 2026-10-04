@@ -26,6 +26,7 @@ describe('CRUD de Usuarios y Perfil (/api/v1/users)', () => {
         password: 'Password123!@#',
         phone: '+57 300 111 2233',
         userType: 'GENERATOR',
+        dataPolicyAccepted: true,
       });
     normalUserToken = normalRes.body.data.tokens.accessToken;
     normalUserId = normalRes.body.data.user.id;
@@ -40,6 +41,7 @@ describe('CRUD de Usuarios y Perfil (/api/v1/users)', () => {
         password: 'Password123!@#',
         phone: '+57 311 444 5566',
         userType: 'RECYCLER',
+        dataPolicyAccepted: true,
       });
     targetUserToken = targetRes.body.data.tokens.accessToken;
     targetUserId = targetRes.body.data.user.id;
@@ -53,6 +55,7 @@ describe('CRUD de Usuarios y Perfil (/api/v1/users)', () => {
         email: `admin.${Date.now()}@fundacionimara.org`,
         password: 'AdminPassword123!@#',
         userType: 'GENERATOR',
+        dataPolicyAccepted: true,
       });
     adminUserId = adminRes.body.data.user.id;
     createdUserIds.push(adminUserId);
@@ -308,6 +311,7 @@ describe('CRUD de Usuarios y Perfil (/api/v1/users)', () => {
           email: `desactivar.${Date.now()}@fundacionimara.org`,
           password: 'Password123!@#',
           userType: 'GENERATOR',
+          dataPolicyAccepted: true,
         });
       const tempToken = tempUserRes.body.data.tokens.accessToken;
       const tempId = tempUserRes.body.data.user.id;

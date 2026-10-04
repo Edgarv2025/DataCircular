@@ -14,8 +14,14 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(16).default('default_dev_refresh_secret_12345'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('30d'),
   CORS_ORIGIN: z.string().default('*'),
-  DATA_POLICY_URL: z.string().default('https://fundacionimara.org/politica-datos-pendiente'),
-  DATA_POLICY_VERSION: z.string().default('1.0-draft'),
+  DATA_POLICY_URL: z.preprocess(
+    (value) => value === '' || value === 'https://fundacionimara.org/politica-datos-pendiente' ? undefined : value,
+    z.string().url('DATA_POLICY_URL debe ser una URL válida').optional()
+  ),
+  DATA_POLICY_VERSION: z.preprocess(
+    (value) => value === '1.0-draft' ? undefined : value,
+    z.string().min(1).default('pendiente')
+  ),
 });
 
 const parsed = envSchema.safeParse(process.env);

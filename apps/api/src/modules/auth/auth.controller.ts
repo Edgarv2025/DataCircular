@@ -1,6 +1,15 @@
 import { Request, Response, NextFunction } from 'express';
 import { authService, AuthError } from './auth.service';
 import { sendSuccess, sendError } from '../../utils/apiResponse';
+import { env } from '../../config/env';
+
+export function dataPolicyController(_req: Request, res: Response): void {
+  sendSuccess(res, {
+    available: Boolean(env.DATA_POLICY_URL),
+    url: env.DATA_POLICY_URL ?? null,
+    version: env.DATA_POLICY_VERSION,
+  }, 'Información de la política de tratamiento de datos');
+}
 
 export async function registerController(
   req: Request,

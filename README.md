@@ -74,6 +74,14 @@ docker compose up -d
 npm run db:generate
 ```
 
+Para aplicar las migraciones versionadas en la base de datos local:
+
+```bash
+npm run db:migrate
+```
+
+El registro solicita el tipo de participante (generador, reciclador, transportador o transformador). Las cuentas con rol `ADMIN` acceden al panel para listar, crear, editar y desactivar usuarios.
+
 ---
 
 ## 7. Ejecución de Pruebas Automatizadas
@@ -111,7 +119,7 @@ El servidor estará escuchando en:
 
 ## 9. Inicio y Visualización de la Aplicación Móvil (Fase 5)
 
-La aplicación móvil de DATA_CIRCULAR está construida con **React Native**, **Expo SDK 52** y **Expo Router**, conectada en vivo con el backend de Bogotá D.C. Puedes ejecutarla de tres maneras:
+La aplicación móvil de DATA_CIRCULAR está construida con **React Native**, **Expo SDK 57** y **Expo Router**, conectada en vivo con el backend de Bogotá D.C. Puedes ejecutarla de tres maneras:
 
 ### Opción A: En el Navegador Web de tu PC (Recomendada para pruebas rápidas)
 Abre una terminal en VS Code y ejecuta:

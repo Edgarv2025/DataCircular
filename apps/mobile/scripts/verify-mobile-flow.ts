@@ -16,6 +16,7 @@ async function main() {
     password: 'Password123!@#',
     userType: 'RECYCLER' as const,
     phone: '+57 312 9876543',
+    dataPolicyAccepted: true,
   };
 
   console.log('1. [PANTALLA 2 - REGISTRO] Probando registro con backend real...');

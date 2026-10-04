@@ -32,6 +32,7 @@
 
 ## ADR-005: Arquitectura de la Interfaz Móvil (Expo SDK 52, Expo Router y SecureStore)
 - **Fecha**: 2026-09-28
+- **Actualización (2026-09-29)**: Las dependencias móviles se migraron a Expo SDK 57; se conserva esta entrada como registro de la decisión arquitectónica inicial.
 - **Contexto**: Implementación de la Fase 5 para proporcionar la primera versión funcional de la interfaz móvil para la Fundación IMARA en Bogotá D.C.
 - **Decisión**:
   1. **Enrutamiento y Navegación Protegida**: Uso de **Expo Router v4** con grupos de rutas organizados: `app/index.tsx` (Bienvenida/Onboarding), `app/(auth)/` (Registro e Inicio de Sesión) y `app/(app)/` (Perfil protegido y Edición de Perfil con guardia de sesión activa).
@@ -40,3 +41,14 @@
   4. **Configuración de Entorno por Plataforma**: Detección automática en `Config.apiUrl`: `localhost` en web/iOS, `10.0.2.2` en emulador Android, o `EXPO_PUBLIC_API_URL` para pruebas en dispositivo móvil físico mediante Expo Go.
   5. **Localización Bogotá D.C.**: Inclusión de selector de las 20 localidades oficiales de Bogotá, prefijo telefónico `+57`, moneda COP y advertencia de tratamiento de datos personales conforme a la Ley 1581 de 2012.
 - **Consecuencias**: Aplicación móvil 100% interoperable con el backend en PostgreSQL, verificada extremo a extremo con pruebas automatizadas (`npm run test:mobile`).
+
+## ADR-006: Desacoplamiento de Roles Organizacionales y Autorización Multitenant (Fase 7)
+- **Fecha**: 2026-10-04
+- **Contexto**: Se requiere soportar empresas, asociaciones de recicladores, cooperativas y fundaciones (Fundación IMARA) con usuarios pertenecientes a una o múltiples organizaciones, sin duplicar ni romper el sistema de autenticación de plataforma (UserRole.USER / UserRole.ADMIN).
+- **Decisión**:
+  1. **Separación de Niveles de Autorización**: La autenticación a nivel de plataforma permanece en JWT Bearer (`User.role`: `USER`, `ADMIN`). La autorización a nivel de organización se maneja mediante `OrganizationMember`, vinculando al usuario con la entidad y un `Role` interno (`OWNER`, `ADMIN`, `MEMBER`, `OPERATOR`).
+  2. **Permisos Granulares**: Se define una matriz de permisos (`org:read`, `org:update`, `org:delete`, `members:read`, `members:invite`, `members:update`, `members:remove`, `verification:request`, `verification:review`). Los middlewares `requireOrgMember` y `requireOrgPermission` garantizan que las operaciones sobre una entidad sean ejecutadas solo por miembros autorizados, permitiendo bypass exclusivo a administradores globales de la plataforma (`ADMIN`).
+  3. **Protección del Creador y Propietario (OWNER)**: Al crear una organización se asigna automáticamente al usuario como `OWNER`. La lógica de negocio impide la degradación o eliminación del único propietario activo de una entidad.
+  4. **Preparación para Certificación Ambiental**: Se modeló el estado de verificación (`UNVERIFIED`, `PENDING`, `VERIFIED`, `REJECTED`) con soporte para radicación de certificados y dictamen administrativo, listo para la integración con la Fundación IMARA y entes distritales (UAESP).
+- **Consecuencias**: Arquitectura extensible, altamente modular, 100% testeada con 23 pruebas de integración dedicadas y 0 impacto en las fases anteriores.
+

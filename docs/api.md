@@ -49,11 +49,15 @@ Registra un nuevo usuario en la plataforma.
   "email": "carlos.mendoza@fundacionimara.org",
   "password": "Password123!@#",
   "phone": "+57 300 123 4567",
-  "userType": "RECYCLER"
+  "userType": "RECYCLER",
+  "dataPolicyAccepted": true
 }
 ```
 
-`userType` es obligatorio y acepta `GENERATOR`, `RECYCLER`, `TRANSPORTER` o `TRANSFORMER`. El rol de acceso no se puede elegir en el registro público: siempre se asigna `USER`.
+`userType` es obligatorio y acepta `GENERATOR`, `RECYCLER`, `TRANSPORTER` o `TRANSFORMER`. `dataPolicyAccepted` debe ser `true`; la aceptación queda registrada con usuario, fecha, versión, URL configurada (si existe) y estado. El rol de acceso no se puede elegir en el registro público: siempre se asigna `USER`.
+
+### `GET /api/v1/auth/data-policy`
+Devuelve disponibilidad, URL y versión configuradas para la política. Configura `DATA_POLICY_URL` con cualquier URL válida cuando la referencia oficial esté disponible; si queda vacía, la API informa `available: false` y `url: null`.
 
 #### Respuesta Exitosa (201 Created)
 ```json
@@ -212,7 +216,77 @@ Las siguientes rutas son exclusivas de `ADMIN` y devuelven datos seguros (`SafeU
 
 ---
 
-## 4. Formato Estándar de Errores
+## 4. Módulo de Organizaciones, Empresas y Membresías (`/api/v1/organizations`)
+
+### `GET /api/v1/organizations/roles/available`
+Consulta el catálogo de roles del sistema (`OWNER`, `ADMIN`, `MEMBER`, `OPERATOR`) y sus permisos granulares asignados.
+- **Acceso**: Privado (`Authorization: Bearer <accessToken>`).
+
+### `POST /api/v1/organizations`
+Registra una nueva empresa, asociación, fundación o cooperativa en Bogotá D.C. El usuario creador queda automáticamente vinculado como `OWNER`.
+- **Acceso**: Privado (`Authorization: Bearer <accessToken>`).
+- **Body**:
+```json
+{
+  "name": "EcoTransformaciones Bogotá S.A.S.",
+  "legalName": "EcoTransformaciones de Colombia S.A.S.",
+  "taxId": "901.123.456-1",
+  "orgType": "COMPANY",
+  "activityType": "TRANSFORMER",
+  "email": "contacto@ecotransformaciones.co",
+  "phone": "+57 310 999 8877",
+  "address": "Carrera 68 # 19-45",
+  "locality": "Puente Aranda",
+  "city": "Bogotá D.C."
+}
+```
+
+### `GET /api/v1/organizations`
+Lista las organizaciones a las que pertenece el usuario autenticado (o todas si es administrador con `?all=true`). Admite filtros por `status`, `orgType`, `locality` y `verificationStatus`.
+- **Acceso**: Privado (`Authorization: Bearer <accessToken>`).
+
+### `GET /api/v1/organizations/:id`
+Obtiene los detalles de la organización, el recuento de miembros y el rol del usuario autenticado en la entidad.
+- **Acceso**: Privado (requiere ser miembro activo o administrador de plataforma).
+
+### `PATCH /api/v1/organizations/:id`
+Actualiza la información comercial, legal, NIT o datos de contacto de la organización.
+- **Acceso**: Privado (requiere permiso `org:update` o administrador de plataforma).
+
+### `DELETE /api/v1/organizations/:id`
+Desactiva lógicamente la entidad (`Soft Delete`, `status: INACTIVE`, `deletedAt: Timestamp`).
+- **Acceso**: Privado (requiere permiso `org:delete` o administrador de plataforma).
+
+### `GET /api/v1/organizations/:id/members`
+Lista los miembros vinculados a la organización con su rol y datos públicos.
+- **Acceso**: Privado (requiere permiso `members:read` o administrador de plataforma).
+
+### `POST /api/v1/organizations/:id/members`
+Invita o vincula a un usuario registrado a la organización asignándole un rol (`OWNER`, `ADMIN`, `MEMBER`, `OPERATOR`).
+- **Acceso**: Privado (requiere permiso `members:invite` o administrador de plataforma).
+- **Body**: `{ "email": "colaborador@imara.org", "roleName": "MEMBER" }`.
+
+### `PATCH /api/v1/organizations/:id/members/:memberId`
+Modifica el rol o estado de membresía de un integrante. Protegido contra la degradación del único `OWNER`.
+- **Acceso**: Privado (requiere permiso `members:update` o administrador de plataforma).
+
+### `DELETE /api/v1/organizations/:id/members/:memberId`
+Desvincula a un integrante de la organización. Protegido contra la eliminación del único `OWNER`.
+- **Acceso**: Privado (requiere permiso `members:remove` o auto-desvinculación).
+
+### `POST /api/v1/organizations/:id/verification`
+Radica una solicitud formal de certificación y verificación institucional ante la Fundación IMARA o entes distritales.
+- **Acceso**: Privado (requiere permiso `verification:request`).
+- **Body**: `{ "notes": "Certificado de cumplimiento ambiental", "certificateUrl": "https://..." }`.
+
+### `POST /api/v1/organizations/:id/verification/review`
+Aprueba (`VERIFIED`) o rechaza (`REJECTED`) una solicitud de certificación institucional.
+- **Acceso**: Exclusivo para administradores de plataforma (`requireRole('ADMIN')`).
+- **Body**: `{ "status": "VERIFIED", "notes": "Aprobado tras visita técnica" }`.
+
+---
+
+## 5. Formato Estándar de Errores
 ```json
 {
   "success": false,

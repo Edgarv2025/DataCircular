@@ -4,6 +4,7 @@ import {
   loginController,
   logoutController,
   refreshController,
+  dataPolicyController,
 } from './auth.controller';
 import { validateBody } from '../../middleware/validate';
 import { authenticateToken } from '../../middleware/auth.middleware';
@@ -15,6 +16,9 @@ import {
 } from '@data-circular/shared';
 
 const router = Router();
+
+// GET /api/v1/auth/data-policy
+router.get('/data-policy', dataPolicyController);
 
 // POST /api/v1/auth/register
 router.post(

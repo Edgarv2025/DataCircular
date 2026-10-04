@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
+  Linking,
   Platform,
   ScrollView,
   StyleSheet,
@@ -16,7 +17,8 @@ import { Button } from '../../src/components/Button';
 import { Card } from '../../src/components/Card';
 import { ErrorBanner } from '../../src/components/ErrorBanner';
 import { LocalityPicker } from '../../src/components/LocalityPicker';
-import { PASSWORD_REGEX, UserType, USER_TYPES } from '@data-circular/shared';
+import { DataPolicyInfoDto, PASSWORD_REGEX, UserType, USER_TYPES } from '@data-circular/shared';
+import { AuthApi } from '../../src/api/auth.api';
 
 const USER_TYPE_OPTIONS: { value: UserType; label: string; detail: string }[] = [
   { value: 'GENERATOR', label: 'Generador', detail: 'Ofrezco materiales' },
@@ -36,10 +38,16 @@ export default function RegisterScreen() {
   const [selectedLocality, setSelectedLocality] = useState('Chapinero');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [dataPolicyAccepted, setDataPolicyAccepted] = useState(false);
+  const [dataPolicyInfo, setDataPolicyInfo] = useState<DataPolicyInfoDto | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    AuthApi.getDataPolicy().then(setDataPolicyInfo).catch(() => setDataPolicyInfo(null));
+  }, []);
 
   const validate = (): boolean => {
     const errors: Record<string, string> = {};
@@ -91,6 +99,10 @@ export default function RegisterScreen() {
       errors.confirmPassword = 'Las contraseñas no coinciden';
     }
 
+    if (!dataPolicyAccepted) {
+      errors.dataPolicyAccepted = 'Debes aceptar el tratamiento de tus datos personales';
+    }
+
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -117,6 +129,7 @@ export default function RegisterScreen() {
         password,
         phone: normalizedPhone,
         userType: userType!,
+        dataPolicyAccepted,
       });
 
       if (result.success) {
@@ -256,10 +269,40 @@ export default function RegisterScreen() {
 
           <View style={styles.habeasDataBox}>
             <Text style={styles.habeasDataText}>
-              🛡️ Al registrarte autorizas el tratamiento de tus datos personales conforme a la{' '}
-              <Text style={{ fontWeight: '700' }}>Ley 1581 de 2012 de Colombia</Text> y la política institucional de la{' '}
-              <Text style={{ fontWeight: '700' }}>Fundación IMARA</Text>.
+              Fundación IMARA informa que cuenta con una política institucional de tratamiento de datos personales.
             </Text>
+            {dataPolicyInfo?.url ? (
+              <TouchableOpacity
+                accessibilityRole="link"
+                onPress={() => Linking.openURL(dataPolicyInfo.url!)}
+                style={styles.policyLink}
+              >
+                <Text style={styles.policyLinkText}>Consultar política (versión {dataPolicyInfo.version})</Text>
+              </TouchableOpacity>
+            ) : (
+              <Text style={styles.policyPendingText}>Enlace de consulta pendiente de configuración.</Text>
+            )}
+            <TouchableOpacity
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: dataPolicyAccepted }}
+              onPress={() => {
+                setDataPolicyAccepted(!dataPolicyAccepted);
+                if (fieldErrors.dataPolicyAccepted) {
+                  setFieldErrors({ ...fieldErrors, dataPolicyAccepted: '' });
+                }
+              }}
+              style={styles.policyConsentRow}
+            >
+              <View style={[styles.policyCheckbox, dataPolicyAccepted && styles.policyCheckboxChecked]}>
+                {dataPolicyAccepted ? <Text style={styles.policyCheckmark}>✓</Text> : null}
+              </View>
+              <Text style={styles.habeasDataText}>
+                Acepto expresamente el tratamiento de mis datos personales conforme a dicha política.
+              </Text>
+            </TouchableOpacity>
+            {fieldErrors.dataPolicyAccepted ? (
+              <Text style={styles.policyError}>{fieldErrors.dataPolicyAccepted}</Text>
+            ) : null}
           </View>
 
           <Button
@@ -392,6 +435,51 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.textMuted,
     lineHeight: 16,
+  },
+  policyLink: {
+    alignSelf: 'flex-start',
+    paddingVertical: 6,
+  },
+  policyLinkText: {
+    color: Colors.primary,
+    fontSize: 12,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
+  },
+  policyPendingText: {
+    color: Colors.textMuted,
+    fontSize: 12,
+    marginTop: 6,
+  },
+  policyConsentRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
+  policyCheckbox: {
+    alignItems: 'center',
+    borderColor: Colors.border,
+    borderRadius: 3,
+    borderWidth: 1,
+    height: 20,
+    justifyContent: 'center',
+    width: 20,
+  },
+  policyCheckboxChecked: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  policyCheckmark: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 17,
+  },
+  policyError: {
+    color: Colors.danger,
+    fontSize: 12,
+    marginTop: 4,
   },
   submitButton: {
     marginTop: 14,

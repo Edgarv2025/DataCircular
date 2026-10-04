@@ -129,6 +129,11 @@ router.get('/', (_req: Request, res: Response) => {
             <label>Contraseña (Mín. 8 caracteres, mayúscula, símbolo)</label>
             <input type="password" id="reg-pass" value="ImaraBogota2026!#">
           </div>
+          <div class="form-group">
+            <p id="reg-policy-status">Consultando disponibilidad de la política...</p>
+            <a id="reg-policy-link" hidden target="_blank" rel="noopener noreferrer">Consultar política</a>
+            <label><input type="checkbox" id="reg-policy-accepted"> Acepto expresamente el tratamiento de mis datos personales.</label>
+          </div>
         </div>
         <div>
           <button onclick="runRegister()">Registrar con Hash Argon2id</button>
@@ -251,11 +256,17 @@ router.get('/', (_req: Request, res: Response) => {
     async function runRegister() {
       const el = document.getElementById('out-reg');
       el.textContent = 'Enviando registro a /api/v1/auth/register...';
+      if (!document.getElementById('reg-policy-accepted').checked) {
+        el.textContent = 'Debes aceptar expresamente el tratamiento de datos personales.';
+        return;
+      }
       const body = {
         fullName: document.getElementById('reg-name').value,
         email: document.getElementById('reg-email').value,
         password: document.getElementById('reg-pass').value,
         phone: document.getElementById('reg-phone').value,
+        userType: 'GENERATOR',
+        dataPolicyAccepted: true,
       };
       try {
         const res = await fetch('/api/v1/auth/register', {
@@ -274,6 +285,26 @@ router.get('/', (_req: Request, res: Response) => {
         el.textContent = 'Error: ' + err.message;
       }
     }
+
+    fetch('/api/v1/auth/data-policy')
+      .then((response) => response.json())
+      .then((response) => {
+        const policy = response.data;
+        const status = document.getElementById('reg-policy-status');
+        const link = document.getElementById('reg-policy-link');
+        status.textContent = 'La política institucional de tratamiento de datos está registrada.';
+        if (policy && policy.available && policy.url) {
+          link.href = policy.url;
+          link.textContent = 'Consultar política (versión ' + policy.version + ')';
+          link.hidden = false;
+        } else {
+          status.textContent += ' Enlace pendiente de configuración.';
+        }
+      })
+      .catch(() => {
+        document.getElementById('reg-policy-status').textContent =
+          'No fue posible consultar el enlace de la política.';
+      });
 
     async function runLogin() {
       const el = document.getElementById('out-login');

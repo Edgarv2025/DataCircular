@@ -27,7 +27,7 @@ graph TD
 ## 3. Estructura Monorepo
 El proyecto utiliza un esquema de Monorepo basado en `npm workspaces`:
 - `apps/api`: Servidor REST construido con Express, TypeScript y Prisma ORM.
-- `apps/mobile`: Aplicación móvil desarrollada con Expo SDK 52 y React Native.
+- `apps/mobile`: Aplicación móvil desarrollada con Expo SDK 57 y React Native 0.86.
 - `packages/shared`: Librería interna con contratos de datos, validaciones y constantes.
 - `docs/`: Repositorio central de documentación técnica y manuales.
 

@@ -61,7 +61,10 @@ export class UsersRepository {
   /**
    * Crea un nuevo usuario en la base de datos con correo normalizado.
    */
-  async create(input: CreateUserInput): Promise<SafeUserDto> {
+  async create(
+    input: CreateUserInput,
+    policyAcceptance?: { policyVersion: string; policyUrl: string | null }
+  ): Promise<SafeUserDto> {
     const user = await prisma.user.create({
       data: {
         fullName: input.fullName.trim(),
@@ -71,6 +74,16 @@ export class UsersRepository {
         passwordHash: input.passwordHash,
         role: (input.role as UserRole) || UserRole.USER,
         status: UserStatus.ACTIVE,
+        ...(policyAcceptance
+          ? {
+              dataPolicyAcceptance: {
+                create: {
+                  policyVersion: policyAcceptance.policyVersion,
+                  policyUrl: policyAcceptance.policyUrl,
+                },
+              },
+            }
+          : {}),
       },
     });
 

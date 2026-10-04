@@ -88,9 +88,74 @@ model User {
 
 ---
 
-## 4. Historial de Migraciones Versionadas
+## 4. Entidad `DataPolicyAcceptance` (Implementada en Fase 6)
+
+Registra la aceptación expresa de la Política de Tratamiento de Datos Personales (Ley 1581 de 2012 / Habeas Data en Colombia).
+
+| Columna | Tipo PostgreSQL | Restricciones | Valor por defecto | Descripción |
+| :--- | :--- | :--- | :--- | :--- |
+| `id` | `UUID` | PRIMARY KEY, NOT NULL | UUIDv4 | Identificador único de registro |
+| `user_id` | `UUID` | UNIQUE, NOT NULL, FK users(id) | - | Usuario que otorgó el consentimiento |
+| `accepted_at` | `TIMESTAMPTZ(6)` | NOT NULL | CURRENT_TIMESTAMP | Fecha y hora legal de aceptación |
+| `policy_version` | `VARCHAR(100)` | NOT NULL | - | Versión vigente de la política aceptada |
+| `policy_url` | `TEXT` | NULL | NULL | Enlace de consulta oficial |
+| `status` | `DataPolicyAcceptanceStatus` | NOT NULL | `'ACCEPTED'` | Estado del consentimiento |
+
+---
+
+## 5. Entidades de Organizaciones, Membresías, Roles y Permisos (Fase 7)
+
+### 5.1 Entidad `Organization` (`organizations`)
+Modela empresas, asociaciones de recicladores, fundaciones (Fundación IMARA) y cooperativas en el marco de la economía circular de Bogotá D.C.
+
+| Columna | Tipo PostgreSQL | Restricciones | Valor por defecto | Descripción |
+| :--- | :--- | :--- | :--- | :--- |
+| `id` | `UUID` | PRIMARY KEY, NOT NULL | UUIDv4 | Identificador único universal |
+| `name` | `VARCHAR(150)` | NOT NULL | - | Nombre comercial |
+| `legal_name` | `VARCHAR(200)` | NULL | NULL | Razón social oficial |
+| `tax_id` | `VARCHAR(50)` | UNIQUE, NULL | NULL | NIT en Colombia |
+| `org_type` | `OrganizationType` | NOT NULL | `'COMPANY'` | `COMPANY`, `ASSOCIATION`, `FOUNDATION`, `COOPERATIVE`, `INSTITUTION` |
+| `activity_type` | `UserType` | NOT NULL | `'GENERATOR'` | Actividad circular principal |
+| `email` | `VARCHAR(255)` | NULL | NULL | Correo de contacto corporativo |
+| `phone` | `VARCHAR(30)` | NULL | NULL | Teléfono institucional |
+| `address` | `VARCHAR(255)` | NULL | NULL | Dirección física en Bogotá |
+| `locality` | `VARCHAR(100)` | NULL | NULL | Localidad oficial de Bogotá (20 localidades) |
+| `city` | `VARCHAR(100)` | NOT NULL | `'Bogotá D.C.'` | Ciudad sede |
+| `status` | `OrganizationStatus` | NOT NULL | `'ACTIVE'` | `ACTIVE`, `INACTIVE`, `SUSPENDED` |
+| `verification_status` | `VerificationStatus` | NOT NULL | `'UNVERIFIED'` | `UNVERIFIED`, `PENDING`, `VERIFIED`, `REJECTED` |
+| `verified_at` | `TIMESTAMPTZ(6)` | NULL | NULL | Fecha de certificación institucional |
+| `verification_notes` | `TEXT` | NULL | NULL | Dictamen de certificación |
+| `certificate_url` | `TEXT` | NULL | NULL | URL del certificado/documento de soporte |
+| `created_at` | `TIMESTAMPTZ(6)` | NOT NULL | CURRENT_TIMESTAMP | Fecha de creación |
+| `updated_at` | `TIMESTAMPTZ(6)` | NOT NULL | Auto | Fecha de actualización |
+| `deleted_at` | `TIMESTAMPTZ(6)` | NULL | NULL | Marca de tiempo para borrado lógico |
+
+### 5.2 Entidad `Role` (`roles`) y `Permission` (`permissions`)
+Separa limpiamente los roles de acceso a la plataforma (`UserRole`: `USER`, `ADMIN`) de los roles y permisos operativos internos de la organización.
+
+- **Roles de Sistema**:
+  - `OWNER`: Control total de la empresa, transferencias y membresías.
+  - `ADMIN`: Gestión operativa y de miembros.
+  - `MEMBER`: Colaborador activo en economía circular.
+  - `OPERATOR`: Operario de logística y recepción.
+- **Permisos Granulares**:
+  - `org:read`, `org:update`, `org:delete`
+  - `members:read`, `members:invite`, `members:update`, `members:remove`
+  - `verification:request`, `verification:review`
+
+### 5.3 Entidad `OrganizationMember` (`organization_members`)
+Asocia a un usuario con una organización, asignándole un rol y estado de membresía.
+- Restricción de unicidad: `(organization_id, user_id)` para garantizar una única membresía activa por entidad.
+- Regla de integridad: No se permite degradar ni remover al último `OWNER` de una organización activa.
+
+---
+
+## 6. Historial de Migraciones Versionadas
 
 | Migración | Fecha | Descripción |
 | :--- | :--- | :--- |
 | `20260927180227_init_user_model` | 2026-09-27 | Creación de enums `UserStatus`, `UserRole`, tabla `users` e índices correspondientes. |
 | `20261001120000_add_user_type` | 2026-10-01 | Agrega `UserType` y `user_type`, con valor por defecto compatible para cuentas existentes. |
+| `20261002120000_add_data_policy_acceptance` | 2026-10-02 | Agrega tabla `data_policy_acceptances` para Habeas Data (Ley 1581 de 2012). |
+| `20261004140000_add_organizations_and_memberships` | 2026-10-04 | Agrega tablas `organizations`, `roles`, `permissions`, `role_permissions` y `organization_members`. |
+
