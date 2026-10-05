@@ -3,6 +3,8 @@ import { healthRouter } from '../modules/health/health.routes';
 import { authRouter } from '../modules/auth/auth.routes';
 import { usersRouter } from '../modules/users/users.routes';
 import { organizationsRouter } from '../modules/organizations/organizations.routes';
+import { catalogRouter } from '../modules/catalog/catalog.routes';
+import { publicationsRouter } from '../modules/publications/publications.routes';
 
 const v1Router = Router();
 
@@ -17,5 +19,11 @@ v1Router.use('/users', usersRouter);
 
 // Módulo de Organizaciones, Empresas y Membresías (Fase 7)
 v1Router.use('/organizations', organizationsRouter);
+
+// Módulo de Catálogo de Materiales y Unidades (Fase 8)
+v1Router.use('/catalog', catalogRouter);
+
+// Módulo de Publicaciones de Oferta y Demanda (Fase 8)
+v1Router.use('/publications', publicationsRouter);
 
 export { v1Router };

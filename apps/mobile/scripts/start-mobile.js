@@ -1,5 +1,29 @@
 const { networkInterfaces } = require('os');
 const { spawn } = require('child_process');
+const net = require('net');
+
+function isPortAvailable(port) {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+
+    server.once('error', () => resolve(false));
+    server.once('listening', () => {
+      server.close(() => resolve(true));
+    });
+
+    server.listen(port, '0.0.0.0');
+  });
+}
+
+async function getAvailablePort(startPort = 8082, maxAttempts = 20) {
+  for (let port = startPort; port < startPort + maxAttempts; port += 1) {
+    if (await isPortAvailable(port)) {
+      return port;
+    }
+  }
+
+  return startPort;
+}
 
 /**
  * Script de inicio inteligente para Expo en DATA_CIRCULAR.
@@ -44,13 +68,23 @@ const env = {
   EXPO_PACKAGER_HOSTNAME: wifiIp,
 };
 
-const args = process.argv.slice(2);
-const child = spawn('npx', ['expo', 'start', ...args], {
-  stdio: 'inherit',
-  shell: true,
-  env,
-});
+(async () => {
+  const args = process.argv.slice(2);
+  const hasPortArgument = args.some((arg) => arg === '--port' || arg.startsWith('--port='));
 
-child.on('exit', (code) => {
-  process.exit(code || 0);
-});
+  if (!hasPortArgument) {
+    const port = await getAvailablePort();
+    args.push('--port', String(port));
+    console.log(`Puerto seleccionado automáticamente: ${port}`);
+  }
+
+  const child = spawn('npx', ['expo', 'start', ...args], {
+    stdio: 'inherit',
+    shell: true,
+    env,
+  });
+
+  child.on('exit', (code) => {
+    process.exit(code || 0);
+  });
+})();

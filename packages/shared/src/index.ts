@@ -558,3 +558,245 @@ export const reviewVerificationSchema = z.object({
 
 export type ReviewVerificationInput = z.infer<typeof reviewVerificationSchema>;
 
+// ==========================================
+// Catálogo de Materiales y Publicaciones (Fase 8)
+// ==========================================
+
+export const PUBLICATION_TYPES = ['OFFER', 'NEED'] as const;
+export type PublicationType = (typeof PUBLICATION_TYPES)[number];
+
+export const PUBLICATION_STATUSES = ['ACTIVE', 'PAUSED', 'CLOSED', 'EXPIRED'] as const;
+export type PublicationStatus = (typeof PUBLICATION_STATUSES)[number];
+
+export interface MaterialCategoryDto {
+  id: string;
+  name: string;
+  description: string | null;
+  parentId: string | null;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+  parent?: {
+    id: string;
+    name: string;
+  } | null;
+  subcategories?: MaterialCategoryDto[];
+}
+
+export interface UnitDto {
+  id: string;
+  name: string;
+  abbreviation: string;
+  active: boolean;
+}
+
+export interface MaterialPublicationDto {
+  id: string;
+  type: PublicationType;
+  ownerUserId: string;
+  organizationId: string | null;
+  categoryId: string;
+  quantity: number;
+  unitId: string;
+  locationAddress: string;
+  locationCity: string | null;
+  locationArea: string | null;
+  condition: string | null;
+  photoUrl: string | null;
+  isUrgent: boolean;
+  status: PublicationStatus;
+  expiresAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+  ownerUser?: {
+    id: string;
+    fullName: string;
+    email: string;
+    phone: string | null;
+  };
+  organization?: {
+    id: string;
+    name: string;
+    legalName: string | null;
+  } | null;
+  category?: MaterialCategoryDto;
+  unit?: UnitDto;
+}
+
+// Esquemas Zod para Catálogo
+export const createCategorySchema = z.object({
+  name: z
+    .string({ required_error: 'El nombre de la categoría es requerido' })
+    .trim()
+    .min(2, 'El nombre debe tener al menos 2 caracteres')
+    .max(100, 'El nombre no puede exceder 100 caracteres'),
+  description: z
+    .string()
+    .trim()
+    .max(255, 'La descripción no puede exceder 255 caracteres')
+    .optional()
+    .nullable(),
+  parentId: z
+    .string()
+    .uuid('El parentId debe ser un UUID válido')
+    .optional()
+    .nullable(),
+  active: z.boolean().default(true).optional(),
+});
+
+export type CreateCategoryInput = z.infer<typeof createCategorySchema>;
+
+export const updateCategorySchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(2, 'El nombre debe tener al menos 2 caracteres')
+    .max(100, 'El nombre no puede exceder 100 caracteres')
+    .optional(),
+  description: z
+    .string()
+    .trim()
+    .max(255, 'La descripción no puede exceder 255 caracteres')
+    .optional()
+    .nullable(),
+  parentId: z
+    .string()
+    .uuid('El parentId debe ser un UUID válido')
+    .optional()
+    .nullable(),
+  active: z.boolean().optional(),
+});
+
+export type UpdateCategoryInput = z.infer<typeof updateCategorySchema>;
+
+export const createUnitSchema = z.object({
+  name: z
+    .string({ required_error: 'El nombre de la unidad es requerido' })
+    .trim()
+    .min(2, 'El nombre debe tener al menos 2 caracteres')
+    .max(50, 'El nombre no puede exceder 50 caracteres'),
+  abbreviation: z
+    .string({ required_error: 'La abreviatura es requerida' })
+    .trim()
+    .min(1, 'La abreviatura debe tener al menos 1 carácter')
+    .max(10, 'La abreviatura no puede exceder 10 caracteres'),
+  active: z.boolean().default(true).optional(),
+});
+
+export type CreateUnitInput = z.infer<typeof createUnitSchema>;
+
+// Esquemas Zod para Publicaciones
+export const createPublicationSchema = z.object({
+  type: z.enum(PUBLICATION_TYPES, {
+    required_error: 'El tipo de publicación es requerido (OFFER o NEED)',
+  }),
+  organizationId: z
+    .string()
+    .uuid('El ID de organización debe ser un UUID válido')
+    .optional()
+    .nullable(),
+  categoryId: z
+    .string({ required_error: 'La subcategoría de material es requerida' })
+    .uuid('El ID de categoría debe ser un UUID válido'),
+  quantity: z
+    .number({ required_error: 'La cantidad es requerida' })
+    .positive('La cantidad debe ser mayor a cero'),
+  unitId: z
+    .string({ required_error: 'La unidad de medida es requerida' })
+    .uuid('El ID de unidad debe ser un UUID válido'),
+  locationAddress: z
+    .string({ required_error: 'La dirección de ubicación es requerida' })
+    .trim()
+    .min(5, 'La dirección debe tener al menos 5 caracteres')
+    .max(255, 'La dirección no puede exceder 255 caracteres'),
+  locationCity: z
+    .string()
+    .trim()
+    .min(2)
+    .max(100)
+    .default('Bogotá D.C.')
+    .optional(),
+  locationArea: z
+    .string()
+    .trim()
+    .min(2)
+    .max(100)
+    .optional()
+    .nullable(),
+  condition: z
+    .string()
+    .trim()
+    .max(100, 'La condición no puede exceder 100 caracteres')
+    .optional()
+    .nullable(),
+  photoUrl: z
+    .string()
+    .trim()
+    .url('La URL de foto debe ser válida')
+    .max(500)
+    .optional()
+    .nullable(),
+  isUrgent: z.boolean().default(false).optional(),
+  expiresAt: z
+    .string()
+    .datetime({ message: 'La fecha de expiración debe tener formato ISO 8601' })
+    .optional()
+    .nullable(),
+});
+
+export type CreatePublicationInput = z.infer<typeof createPublicationSchema>;
+
+export const updatePublicationSchema = z.object({
+  quantity: z
+    .number()
+    .positive('La cantidad debe ser mayor a cero')
+    .optional(),
+  unitId: z
+    .string()
+    .uuid('El ID de unidad debe ser un UUID válido')
+    .optional(),
+  locationAddress: z
+    .string()
+    .trim()
+    .min(5, 'La dirección debe tener al menos 5 caracteres')
+    .max(255, 'La dirección no puede exceder 255 caracteres')
+    .optional(),
+  locationCity: z
+    .string()
+    .trim()
+    .min(2)
+    .max(100)
+    .optional(),
+  locationArea: z
+    .string()
+    .trim()
+    .min(2)
+    .max(100)
+    .optional()
+    .nullable(),
+  condition: z
+    .string()
+    .trim()
+    .max(100)
+    .optional()
+    .nullable(),
+  photoUrl: z
+    .string()
+    .trim()
+    .url('La URL de foto debe ser válida')
+    .max(500)
+    .optional()
+    .nullable(),
+  isUrgent: z.boolean().optional(),
+  status: z.enum(PUBLICATION_STATUSES).optional(),
+  expiresAt: z
+    .string()
+    .datetime({ message: 'La fecha de expiración debe tener formato ISO 8601' })
+    .optional()
+    .nullable(),
+});
+
+export type UpdatePublicationInput = z.infer<typeof updatePublicationSchema>;
+
+

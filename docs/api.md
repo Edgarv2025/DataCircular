@@ -286,7 +286,84 @@ Aprueba (`VERIFIED`) o rechaza (`REJECTED`) una solicitud de certificación inst
 
 ---
 
-## 5. Formato Estándar de Errores
+## 5. Módulo de Catálogo de Materiales y Unidades (`/api/v1/catalog`)
+
+### `GET /api/v1/catalog/categories`
+Consulta el árbol completo de categorías y subcategorías de materiales aprovechables.
+- **Acceso**: Privado (`Authorization: Bearer <accessToken>`).
+
+### `GET /api/v1/catalog/categories/:id`
+Consulta el detalle de una categoría o subcategoría con su padre y descendientes.
+- **Acceso**: Privado (`Authorization: Bearer <accessToken>`).
+
+### `POST /api/v1/catalog/categories`
+Crea una nueva categoría raíz o subcategoría (requiere `parentId` existente).
+- **Acceso**: Exclusivo administradores (`requireRole('ADMIN')`).
+- **Body**: `{ "name": "Biopolímeros", "description": "Polímeros biodegradables", "parentId": "UUID" }`.
+
+### `PATCH /api/v1/catalog/categories/:id`
+Actualiza nombre, descripción, estado activo o pertenencia jerárquica de una categoría.
+- **Acceso**: Exclusivo administradores (`requireRole('ADMIN')`).
+
+### `GET /api/v1/catalog/units`
+Lista todas las unidades de medida activas para cuantificar materiales (kg, ton, und, l, m3, bulto).
+- **Acceso**: Privado (`Authorization: Bearer <accessToken>`).
+
+### `POST /api/v1/catalog/units`
+Registra una nueva unidad de medida estandarizada.
+- **Acceso**: Exclusivo administradores (`requireRole('ADMIN')`).
+- **Body**: `{ "name": "Galón", "abbreviation": "gal" }`.
+
+---
+
+## 6. Módulo de Publicaciones de Oferta y Demanda (`/api/v1/publications`)
+
+### `POST /api/v1/publications`
+Crea una oferta (`OFFER`) o necesidad (`NEED`) de material aprovechable.
+- **Acceso**: Privado (`Authorization: Bearer <accessToken>`).
+- **Regla de negocio**: `categoryId` debe ser obligatoriamente una subcategoría hoja (`parent_id` no nulo). Si se publica a nombre de una organización, el usuario debe ser miembro activo.
+- **Body**:
+```json
+{
+  "type": "OFFER",
+  "organizationId": null,
+  "categoryId": "550e8400-e29b-41d4-a716-446655440000",
+  "quantity": 250.5,
+  "unitId": "660e8400-e29b-41d4-a716-446655440001",
+  "locationAddress": "Calle 100 # 19-61",
+  "locationCity": "Bogotá D.C.",
+  "locationArea": "Usaquén",
+  "condition": "limpio y clasificado",
+  "photoUrl": "https://data-circular.imara.org/uploads/pet.jpg",
+  "isUrgent": true,
+  "expiresAt": "2026-12-31T23:59:59.000Z"
+}
+```
+
+### `GET /api/v1/publications/:id`
+Obtiene el detalle completo de una publicación, incluyendo categoría, unidad y datos de contacto públicos del emisor. Si `expiresAt` está en el pasado, el estado se evalúa dinámicamente como `EXPIRED`.
+- **Acceso**: Privado (`Authorization: Bearer <accessToken>`).
+
+### `PATCH /api/v1/publications/:id`
+Modifica cantidad, ubicación, condición, foto o vigencia de una publicación.
+- **Acceso**: Privado (solo el dueño `ownerUserId`, miembros autorizados de la organización o administradores globales).
+
+### `DELETE /api/v1/publications/:id`
+Cierra o elimina lógicamente una publicación (`status: CLOSED`, `deletedAt: Timestamp`).
+- **Acceso**: Privado (solo dueño o miembro autorizado).
+
+### `GET /api/v1/publications/mine`
+Lista las publicaciones propias creadas por el usuario autenticado con soporte de paginación simple (`?page=1&limit=20`).
+- **Acceso**: Privado (`Authorization: Bearer <accessToken>`).
+
+### `GET /api/v1/publications`
+Listado general de publicaciones activas con paginación simple (`?page=1&limit=20`).
+*(Los filtros avanzados de búsqueda y motor de matching corresponden a la Fase 9).*
+- **Acceso**: Privado (`Authorization: Bearer <accessToken>`).
+
+---
+
+## 7. Formato Estándar de Errores
 ```json
 {
   "success": false,

@@ -52,3 +52,15 @@
   4. **Preparación para Certificación Ambiental**: Se modeló el estado de verificación (`UNVERIFIED`, `PENDING`, `VERIFIED`, `REJECTED`) con soporte para radicación de certificados y dictamen administrativo, listo para la integración con la Fundación IMARA y entes distritales (UAESP).
 - **Consecuencias**: Arquitectura extensible, altamente modular, 100% testeada con 23 pruebas de integración dedicadas y 0 impacto en las fases anteriores.
 
+## ADR-007: Modelo Jerárquico de Materiales, Publicaciones Desacopladas y Almacenamiento Temporal (Fase 8)
+- **Fecha**: 2026-10-05
+- **Contexto**: Implementación del catálogo estructurado de materiales aprovechables y el modelo de publicaciones de oferta y necesidad para la economía circular, preparando los datos para el motor de coincidencia (Fase 9).
+- **Decisión**:
+  1. **Jerarquía Recursiva de Categorías (`parentId`)**: Se utiliza una auto-relación en `MaterialCategory` para modelar 9 categorías principales y 39 subcategorías hoja reales del mercado colombiano de reciclaje. Se excluyeron deliberadamente los residuos peligrosos (RESPEL) por estar fuera del alcance del MVP.
+  2. **Regla de Hoja Obligatoria**: Las publicaciones no pueden apuntar a una categoría raíz (ej. "Plásticos" o "Metales"); deben especificar una subcategoría hoja (ej. "PET" o "Aluminio"), garantizando la granularidad requerida para el futuro matching.
+  3. **No Dependencia de Condiciones de Usuario**: El emparejamiento (Fase 9) se realizará comparando publicaciones entre sí (oferta vs. necesidad según requerimientos 7.3 y 12), evitando tablas huérfanas de preferencias por usuario.
+  4. **Evaluación Perezosa de Expiración (Lazy Expiration Check)**: Al consultar cualquier publicación, el sistema evalúa dinámicamente si `expiresAt < now()` y refleja el estado `EXPIRED` de inmediato, sincronizando PostgreSQL sin necesidad de cron jobs adicionales en este momento.
+  5. **Almacenamiento Temporal de Fotografías (`photoUrl`)**: Dado que el proveedor definitivo de almacenamiento de archivos (S3, GCS, Cloudinary o MinIO) se encuentra "por seleccionar" según la sección 13 de Requerimientos, se implementa `photoUrl` como campo de texto para URL o almacenamiento local temporal, con documentación explícita (TODO) para su migración futura.
+- **Consecuencias**: Catálogo normalizado, 76 pruebas backend automatizadas pasando (100%), arquitectura desacoplada y lista para el motor de búsqueda y coincidencia de la Fase 9.
+
+

@@ -53,6 +53,7 @@ model User {
   dataPolicyAcceptance DataPolicyAcceptance?
   memberships  OrganizationMember[] @relation("UserMemberships")
   invitedMembers OrganizationMember[] @relation("InvitedMembers")
+  publications MaterialPublication[] @relation("UserPublications")
 
   @@index([status, deletedAt])
   @@index([email])
@@ -126,6 +127,7 @@ model Organization {
 
   members            OrganizationMember[]
   roles              Role[]
+  publications       MaterialPublication[] @relation("OrganizationPublications")
 
   @@index([status, deletedAt])
   @@index([orgType])
@@ -200,4 +202,87 @@ model OrganizationMember {
   @@index([organizationId])
   @@map("organization_members")
 }
+
+/// Tipos de publicación (oferta de material o necesidad de material)
+enum PublicationType {
+  OFFER
+  NEED
+}
+
+/// Estados de la publicación
+enum PublicationStatus {
+  ACTIVE
+  PAUSED
+  CLOSED
+  EXPIRED
+}
+
+/// Categoría o subcategoría de material aprovechable (soporte jerárquico)
+model MaterialCategory {
+  id          String             @id @default(uuid()) @db.Uuid
+  name        String             @db.VarChar(100)
+  description String?            @db.VarChar(255)
+  parentId    String?            @map("parent_id") @db.Uuid
+  active      Boolean            @default(true)
+  createdAt   DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  parent        MaterialCategory?     @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  subcategories MaterialCategory[]    @relation("CategoryHierarchy")
+  publications  MaterialPublication[]
+
+  @@unique([parentId, name])
+  @@index([parentId])
+  @@index([active])
+  @@map("material_categories")
+}
+
+/// Unidad de medida para publicaciones de material (ej. Kilogramo, Tonelada)
+model Unit {
+  id           String             @id @default(uuid()) @db.Uuid
+  name         String             @unique @db.VarChar(50)
+  abbreviation String             @unique @db.VarChar(10)
+  active       Boolean            @default(true)
+  createdAt    DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  publications MaterialPublication[]
+
+  @@map("units")
+}
+
+/// Publicación de oferta o necesidad de material aprovechable
+model MaterialPublication {
+  id              String            @id @default(uuid()) @db.Uuid
+  type            PublicationType
+  ownerUserId     String            @map("owner_user_id") @db.Uuid
+  organizationId  String?           @map("organization_id") @db.Uuid
+  categoryId      String            @map("category_id") @db.Uuid
+  quantity        Decimal           @db.Decimal(12, 2)
+  unitId          String            @map("unit_id") @db.Uuid
+  locationAddress String            @map("location_address") @db.VarChar(255)
+  locationCity    String?           @default("Bogotá D.C.") @map("location_city") @db.VarChar(100)
+  locationArea    String?           @map("location_area") @db.VarChar(100)
+  condition       String?           @db.VarChar(100)
+  photoUrl        String?           @map("photo_url") @db.Text
+  isUrgent        Boolean           @default(false) @map("is_urgent")
+  status          PublicationStatus @default(ACTIVE)
+  expiresAt       DateTime?         @map("expires_at") @db.Timestamptz(6)
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt       DateTime?         @map("deleted_at") @db.Timestamptz(6)
+
+  ownerUser    User              @relation("UserPublications", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  organization Organization?     @relation("OrganizationPublications", fields: [organizationId], references: [id], onDelete: SetNull)
+  category     MaterialCategory  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  unit         Unit              @relation(fields: [unitId], references: [id], onDelete: Restrict)
+
+  @@index([type])
+  @@index([status, deletedAt])
+  @@index([ownerUserId])
+  @@index([organizationId])
+  @@index([categoryId])
+  @@map("material_publications")
+}
+
 

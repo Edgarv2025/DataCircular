@@ -150,7 +150,67 @@ Asocia a un usuario con una organización, asignándole un rol y estado de membr
 
 ---
 
-## 6. Historial de Migraciones Versionadas
+## 6. Catálogo de Materiales y Publicaciones (Fase 8)
+
+### 6.1 Entidad `MaterialCategory` (`material_categories`)
+Soporte jerárquico recursivo (`parentId` autoreferencial hacia `id`) para estructurar categorías raíz (ej. "Plásticos", "Metales", "Papel y cartón") y subcategorías hoja especializadas (ej. "PET", "Aluminio", "Cartón corrugado").
+- **Restricción de unicidad**: `(parent_id, name)` para impedir subcategorías duplicadas bajo un mismo nivel jerárquico.
+- **Regla de negocio**: Las publicaciones solo se pueden asociar a subcategorías hoja (`parent_id` no nulo).
+
+| Columna | Tipo PostgreSQL | Restricciones | Valor por defecto | Descripción |
+| :--- | :--- | :--- | :--- | :--- |
+| `id` | `UUID` | PRIMARY KEY, NOT NULL | UUIDv4 | Identificador único |
+| `name` | `VARCHAR(100)` | NOT NULL | - | Nombre de categoría o subcategoría |
+| `description` | `VARCHAR(255)` | NULL | NULL | Descripción técnica o ejemplos |
+| `parent_id` | `UUID` | NULL, FK material_categories(id) | NULL | Identificador de categoría padre |
+| `active` | `BOOLEAN` | NOT NULL | `true` | Estado activo/inactivo |
+| `created_at` | `TIMESTAMPTZ(6)` | NOT NULL | CURRENT_TIMESTAMP | Fecha de creación |
+| `updated_at` | `TIMESTAMPTZ(6)` | NOT NULL | Auto | Fecha de actualización |
+
+### 6.2 Entidad `Unit` (`units`)
+Unidades de medida estandarizadas para el peso, volumen o unidades de materiales reciclables en Colombia.
+- **Unidades sembradas**: Kilogramo (`kg`), Tonelada (`ton`), Unidad (`und`), Litro (`l`), Metro cúbico (`m3`), Bulto/Saco (`bulto`).
+
+| Columna | Tipo PostgreSQL | Restricciones | Valor por defecto | Descripción |
+| :--- | :--- | :--- | :--- | :--- |
+| `id` | `UUID` | PRIMARY KEY, NOT NULL | UUIDv4 | Identificador único |
+| `name` | `VARCHAR(50)` | UNIQUE, NOT NULL | - | Nombre completo de la unidad |
+| `abbreviation` | `VARCHAR(10)` | UNIQUE, NOT NULL | - | Símbolo o abreviatura normalizada |
+| `active` | `BOOLEAN` | NOT NULL | `true` | Estado operativo |
+| `created_at` | `TIMESTAMPTZ(6)` | NOT NULL | CURRENT_TIMESTAMP | Fecha de creación |
+| `updated_at` | `TIMESTAMPTZ(6)` | NOT NULL | Auto | Fecha de actualización |
+
+### 6.3 Entidad `MaterialPublication` (`material_publications`)
+Modela ofertas (`OFFER`) y necesidades (`NEED`) de materiales aprovechables generadas por personas naturales o jurídicas.
+- **Tipos (`PublicationType`)**: `OFFER` (material disponible para entregar/vender), `NEED` (material requerido para comprar/recibir).
+- **Estados (`PublicationStatus`)**: `ACTIVE`, `PAUSED`, `CLOSED`, `EXPIRED`.
+- **Expiración dinámica**: Las publicaciones cuyo `expiresAt` se encuentre en el pasado son evaluadas en tiempo de consulta como `EXPIRED` de forma automática.
+- **Autorización multitenant**: Si `organization_id` no es nulo, los miembros con rol `OWNER`, `ADMIN` o permiso `org:update` de dicha entidad pueden editar o cerrar la publicación.
+
+| Columna | Tipo PostgreSQL | Restricciones | Valor por defecto | Descripción |
+| :--- | :--- | :--- | :--- | :--- |
+| `id` | `UUID` | PRIMARY KEY, NOT NULL | UUIDv4 | Identificador único |
+| `type` | `PublicationType` | NOT NULL | - | `OFFER` o `NEED` |
+| `owner_user_id` | `UUID` | NOT NULL, FK users(id) | - | Creador de la publicación |
+| `organization_id` | `UUID` | NULL, FK organizations(id) | NULL | Entidad corporativa asociada (si aplica) |
+| `category_id` | `UUID` | NOT NULL, FK material_categories(id) | - | Subcategoría hoja de material |
+| `quantity` | `DECIMAL(12, 2)` | NOT NULL | - | Cantidad disponible o requerida |
+| `unit_id` | `UUID` | NOT NULL, FK units(id) | - | Unidad de medida asociada |
+| `location_address` | `VARCHAR(255)` | NOT NULL | - | Dirección de recogida o entrega |
+| `location_city` | `VARCHAR(100)` | NULL | `'Bogotá D.C.'` | Ciudad sede |
+| `location_area` | `VARCHAR(100)` | NULL | NULL | Localidad o sector distrital |
+| `condition` | `VARCHAR(100)` | NULL | NULL | Estado o condición del material |
+| `photo_url` | `TEXT` | NULL | NULL | URL de fotografía de soporte |
+| `is_urgent` | `BOOLEAN` | NOT NULL | `false` | Bandera informativa de prioridad |
+| `status` | `PublicationStatus` | NOT NULL | `'ACTIVE'` | Estado del ciclo de vida |
+| `expires_at` | `TIMESTAMPTZ(6)` | NULL | NULL | Límite temporal de vigencia |
+| `created_at` | `TIMESTAMPTZ(6)` | NOT NULL | CURRENT_TIMESTAMP | Fecha de publicación |
+| `updated_at` | `TIMESTAMPTZ(6)` | NOT NULL | Auto | Fecha de modificación |
+| `deleted_at` | `TIMESTAMPTZ(6)` | NULL | NULL | Marca temporal de cierre lógico |
+
+---
+
+## 7. Historial de Migraciones Versionadas
 
 | Migración | Fecha | Descripción |
 | :--- | :--- | :--- |
@@ -158,4 +218,6 @@ Asocia a un usuario con una organización, asignándole un rol y estado de membr
 | `20261001120000_add_user_type` | 2026-10-01 | Agrega `UserType` y `user_type`, con valor por defecto compatible para cuentas existentes. |
 | `20261002120000_add_data_policy_acceptance` | 2026-10-02 | Agrega tabla `data_policy_acceptances` para Habeas Data (Ley 1581 de 2012). |
 | `20261004140000_add_organizations_and_memberships` | 2026-10-04 | Agrega tablas `organizations`, `roles`, `permissions`, `role_permissions` y `organization_members`. |
+| `20261005140000_add_material_catalog_and_publications` | 2026-10-05 | Agrega tablas `material_categories`, `units` y `material_publications` con enums `PublicationType` y `PublicationStatus`. |
+
 

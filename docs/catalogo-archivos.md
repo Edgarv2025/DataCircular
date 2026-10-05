@@ -341,12 +341,36 @@ Describe cada archivo del repositorio paso a paso, su propósito, responsabilida
   - `organizations.controller.ts` y `organizations.routes.ts`:
     - Endpoints REST para CRUD de empresas, membresías, actualización de roles y solicitud/dictamen de certificación ambiental.
 
-### 6.5 Módulo Dashboard (`modules/dashboard/`)
+### 6.5 Módulo de Catálogo de Materiales y Unidades (`modules/catalog/`) — Fase 8
+- **Archivos**:
+  - `catalog.seed.ts`:
+    - Sembrador de 6 unidades de medida (`kg`, `ton`, `und`, `l`, `m3`, `bulto`) y 9 categorías maestras con sus 39 subcategorías hoja del mercado colombiano de reciclaje.
+  - `catalog.repository.ts`:
+    - Capa de acceso a datos Prisma para listar el árbol jerárquico de categorías, consultar por ID o nombre, y CRUD de unidades de medida.
+  - `catalog.service.ts`:
+    - Validaciones de negocio: unicidad de nombres por nivel, verificación estricta de existencia de `parentId` al crear subcategorías (rechazo si no existe) e impedimento de auto-referencia circular.
+  - `catalog.controller.ts` y `catalog.routes.ts`:
+    - Endpoints REST para `/api/v1/catalog/categories` y `/api/v1/catalog/units`. Lectura abierta a usuarios autenticados, mutaciones restringidas a rol `ADMIN`.
+
+### 6.6 Módulo de Publicaciones de Oferta y Necesidad (`modules/publications/`) — Fase 8
+- **Archivos**:
+  - `publications.repository.ts`:
+    - Persistencia en PostgreSQL para publicaciones (`OFFER`/`NEED`), cantidades, unidades, ubicación y vigencia.
+    - Implementación de **Lazy Expiration Check**: evalúa en tiempo de consulta si `expiresAt < now()` y sincroniza el estado `EXPIRED` en PostgreSQL.
+  - `publications.service.ts`:
+    - Reglas de dominio:
+      - Validación obligatoria de que `categoryId` sea una subcategoría hoja (`parentId` no nulo).
+      - Autorización multitenant: edición/cierre restringido al creador (`ownerUserId`), miembros autorizados de la entidad (`OWNER`, `ADMIN` o permiso `org:update`) o administradores de plataforma.
+      - Validación de membresía activa al publicar a nombre de una organización.
+  - `publications.controller.ts` y `publications.routes.ts`:
+    - Endpoints REST montados en `/api/v1/publications`: creación, detalle, edición, cierre lógico, listado propio (`/mine`) y listado general paginado.
+
+### 6.7 Módulo Dashboard (`modules/dashboard/`)
 - **Archivos**: `dashboard.routes.ts`
 - **Propósito**: Consola web servida en la raíz `GET /` con interfaz HTML interactiva para pruebas manuales rápidas de salud, registro y login desde el navegador.
 
-### 6.6 Enrutamiento Principal y Servidor
-- **`apps/api/src/routes/v1.routes.ts`**: Enrutador central que monta `/health`, `/auth`, `/users` y `/organizations` bajo el prefijo común `/api/v1`.
+### 6.8 Enrutamiento Principal y Servidor
+- **`apps/api/src/routes/v1.routes.ts`**: Enrutador central que monta `/health`, `/auth`, `/users`, `/organizations`, `/catalog` y `/publications` bajo el prefijo común `/api/v1`.
 - **`apps/api/src/app.ts`**: Fábrica de la aplicación Express (`createApp`) configurando Helmet, CORS dinámico, parsers JSON y middlewares de error.
 - **`apps/api/src/server.ts`**: Punto de entrada del proceso. Conecta a PostgreSQL, arranca el servidor HTTP en el puerto configurado y registra manejadores para Graceful Shutdown (`SIGTERM`, `SIGINT`).
 
@@ -354,7 +378,7 @@ Describe cada archivo del repositorio paso a paso, su propósito, responsabilida
 
 ## 7. Backend API — Suites de Pruebas Automatizadas (`apps/api/tests/`)
 
-- **Tecnología**: Vitest + Supertest (60 pruebas automatizadas, 100% pasando).
+- **Tecnología**: Vitest + Supertest (76 pruebas automatizadas, 100% pasando).
 1. `tests/health.test.ts` (2 tests):
    - Verifica respuesta 200 en `/api/v1/health` con conectividad a PostgreSQL.
    - Verifica respuesta 404 en rutas inexistentes.
@@ -388,6 +412,17 @@ Describe cada archivo del repositorio paso a paso, su propósito, responsabilida
    - Rechazo de degradación o eliminación del único `OWNER`.
    - Flujo de solicitud de verificación institucional y dictamen administrativo por parte de `ADMIN`.
    - Desactivación lógica de la organización (`Soft Delete`).
+6. `tests/catalog-and-publications.test.ts` (16 tests):
+   - Verificación de catálogo sembrado (9 categorías principales y 39 subcategorías).
+   - Verificación de unidades mínimas (kg, ton, und, l, m3, bulto).
+   - Jerarquía de categorías (rechazo de subcategoría si `parentId` no existe).
+   - Rechazo de publicación sobre categoría principal (400 Bad Request).
+   - Creación exitosa de oferta personal y necesidad corporativa.
+   - Edición por dueño y por miembro de organización con rol `ADMIN`.
+   - Rechazo de edición por tercero no autorizado (403 Forbidden).
+   - Expiración dinámica reflejada como `EXPIRED`.
+   - Listado propio (`/mine`) y listado general paginado.
+   - Cierre y eliminación lógica de publicación (`status: CLOSED`).
 
 ---
 
