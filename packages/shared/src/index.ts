@@ -622,6 +622,7 @@ export interface MaterialPublicationDto {
   } | null;
   category?: MaterialCategoryDto;
   unit?: UnitDto;
+  publicacionesCompatibles?: number;
 }
 
 // Esquemas Zod para Catálogo
@@ -798,5 +799,53 @@ export const updatePublicationSchema = z.object({
 });
 
 export type UpdatePublicationInput = z.infer<typeof updatePublicationSchema>;
+
+// ==========================================
+// FASE 9: BÚSQUEDA, FILTROS Y COINCIDENCIAS
+// ==========================================
+
+export const PUBLICATION_SORT_OPTIONS = ['recent', 'urgent_first'] as const;
+export type PublicationSortOption = (typeof PUBLICATION_SORT_OPTIONS)[number];
+
+export const searchPublicationsQuerySchema = z.object({
+  type: z.enum(PUBLICATION_TYPES).optional(),
+  categoryId: z.string().uuid('El ID de categoría debe ser un UUID válido').optional(),
+  city: z.string().trim().optional(),
+  area: z.string().trim().optional(),
+  minQuantity: z.coerce.number().min(0, 'La cantidad mínima no puede ser negativa').optional(),
+  maxQuantity: z.coerce.number().min(0, 'La cantidad máxima no puede ser negativa').optional(),
+  unitId: z.string().uuid('El ID de unidad debe ser un UUID válido').optional(),
+  isUrgent: z
+    .union([z.boolean(), z.enum(['true', 'false'])])
+    .transform((v) => (typeof v === 'boolean' ? v : v === 'true'))
+    .optional(),
+  status: z.enum(PUBLICATION_STATUSES).optional(),
+  page: z.coerce.number().int().min(1).default(1).optional(),
+  pageSize: z.coerce.number().int().min(1).max(50).default(20).optional(),
+  sortBy: z.enum(PUBLICATION_SORT_OPTIONS).default('recent').optional(),
+});
+
+export type SearchPublicationsQuery = z.infer<typeof searchPublicationsQuerySchema>;
+
+export interface PublicationSearchResultDto {
+  data: MaterialPublicationDto[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+export interface PublicationMatchDto {
+  publicationId: string;
+  score: number;
+  factors: string[];
+  publication?: MaterialPublicationDto;
+}
+
+export interface MySuggestionsItemDto {
+  publicationId: string;
+  publication: MaterialPublicationDto;
+  matches: PublicationMatchDto[];
+}
 
 

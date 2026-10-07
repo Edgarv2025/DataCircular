@@ -3,10 +3,13 @@ import {
   CreatePublicationInput,
   UpdatePublicationInput,
   SafeUserDto,
+  SearchPublicationsQuery,
+  PublicationSearchResultDto,
 } from '@data-circular/shared';
 import { publicationsRepository } from './publications.repository';
 import { catalogRepository } from '../catalog/catalog.repository';
 import { organizationsRepository } from '../organizations/organizations.repository';
+import { matchesService } from '../matches/matches.service';
 
 export class PublicationError extends Error {
   constructor(
@@ -108,7 +111,11 @@ export class PublicationsService {
     if (!pub) {
       throw new PublicationError('PUBLICATION_NOT_FOUND', 'Publicación no encontrada', 404);
     }
-    return pub;
+    const compatibleCount = await matchesService.countMatchesForPublication(pub.id);
+    return {
+      ...pub,
+      publicacionesCompatibles: compatibleCount,
+    };
   }
 
   async updatePublication(
@@ -171,6 +178,16 @@ export class PublicationsService {
       page: parsedPage,
       limit: parsedLimit,
     };
+  }
+
+  /**
+   * Búsqueda general con filtros combinables y reglas de visibilidad (RF-10, CU-06).
+   */
+  async search(
+    query: SearchPublicationsQuery,
+    user: SafeUserDto
+  ): Promise<PublicationSearchResultDto> {
+    return publicationsRepository.search(query, user);
   }
 }
 

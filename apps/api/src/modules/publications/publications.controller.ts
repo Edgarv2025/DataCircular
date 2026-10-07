@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import {
   createPublicationSchema,
   updatePublicationSchema,
+  searchPublicationsQuerySchema,
 } from '@data-circular/shared';
 import { publicationsService } from './publications.service';
 import { sendSuccess } from '../../utils/apiResponse';
@@ -68,6 +69,16 @@ export class PublicationsController {
 
       const result = await publicationsService.listAll(page, limit);
       sendSuccess(res, result, 'Listado general de publicaciones obtenido exitosamente');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async search(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const query = searchPublicationsQuerySchema.parse(req.query);
+      const result = await publicationsService.search(query, req.user!);
+      sendSuccess(res, result, 'Búsqueda de publicaciones realizada exitosamente');
     } catch (err) {
       next(err);
     }

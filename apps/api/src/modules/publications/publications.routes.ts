@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticateToken } from '../../middleware/auth.middleware';
 import { publicationsController } from './publications.controller';
+import { matchesController } from '../matches/matches.controller';
 
 const publicationsRouter = Router();
 
@@ -9,6 +10,8 @@ publicationsRouter.use(authenticateToken);
 
 publicationsRouter.post('/', publicationsController.create);
 publicationsRouter.get('/mine', publicationsController.listMine);
+publicationsRouter.get('/search', publicationsController.search);
+publicationsRouter.get('/:id/matches', matchesController.getMatches);
 publicationsRouter.get('/', publicationsController.listAll);
 publicationsRouter.get('/:id', publicationsController.getById);
 publicationsRouter.patch('/:id', publicationsController.update);

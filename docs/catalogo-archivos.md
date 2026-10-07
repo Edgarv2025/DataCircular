@@ -362,15 +362,29 @@ Describe cada archivo del repositorio paso a paso, su propósito, responsabilida
       - Validación obligatoria de que `categoryId` sea una subcategoría hoja (`parentId` no nulo).
       - Autorización multitenant: edición/cierre restringido al creador (`ownerUserId`), miembros autorizados de la entidad (`OWNER`, `ADMIN` o permiso `org:update`) o administradores de plataforma.
       - Validación de membresía activa al publicar a nombre de una organización.
+      - Búsqueda general paginada con filtros combinables (`search`).
+      - Inclusión del contador liviano `publicacionesCompatibles` en el detalle.
   - `publications.controller.ts` y `publications.routes.ts`:
-    - Endpoints REST montados en `/api/v1/publications`: creación, detalle, edición, cierre lógico, listado propio (`/mine`) y listado general paginado.
+    - Endpoints REST montados en `/api/v1/publications`: creación, detalle, edición, cierre lógico, listado propio (`/mine`), listado general paginado, búsqueda avanzada (`/search`) y consulta de coincidencias (`/:id/matches`).
 
-### 6.7 Módulo Dashboard (`modules/dashboard/`)
+### 6.7 Módulo de Coincidencias y Sugerencias (`modules/matches/`)
+- **Archivos**:
+  - `matches.service.ts`:
+    - Algoritmo de compatibilidad determinista y explicable (HU-08).
+    - Factores de puntuación: subcategoría (+50), categoría principal (+20), ubicación (+20), cantidad (+15), urgencia (+10), recencia (+5).
+    - Umbral de corte $\ge 40$ puntos.
+    - Estrategia de rendimiento con pre-filtrado en PostgreSQL (índices de categoría y ciudad).
+    - Conteo liviano de coincidencias para el detalle de publicación.
+    - Generador de bandeja de sugerencias para el usuario autenticado (top 5 coincidencias).
+  - `matches.controller.ts`: Controladores HTTP para `/publications/:id/matches` y `/matches/my-suggestions`.
+  - `matches.routes.ts`: Enrutador montado en `/api/v1/matches`.
+
+### 6.8 Módulo Dashboard (`modules/dashboard/`)
 - **Archivos**: `dashboard.routes.ts`
 - **Propósito**: Consola web servida en la raíz `GET /` con interfaz HTML interactiva para pruebas manuales rápidas de salud, registro y login desde el navegador.
 
-### 6.8 Enrutamiento Principal y Servidor
-- **`apps/api/src/routes/v1.routes.ts`**: Enrutador central que monta `/health`, `/auth`, `/users`, `/organizations`, `/catalog` y `/publications` bajo el prefijo común `/api/v1`.
+### 6.9 Enrutamiento Principal y Servidor
+- **`apps/api/src/routes/v1.routes.ts`**: Enrutador central que monta `/health`, `/auth`, `/users`, `/organizations`, `/catalog`, `/publications` y `/matches` bajo el prefijo común `/api/v1`.
 - **`apps/api/src/app.ts`**: Fábrica de la aplicación Express (`createApp`) configurando Helmet, CORS dinámico, parsers JSON y middlewares de error.
 - **`apps/api/src/server.ts`**: Punto de entrada del proceso. Conecta a PostgreSQL, arranca el servidor HTTP en el puerto configurado y registra manejadores para Graceful Shutdown (`SIGTERM`, `SIGINT`).
 
@@ -378,7 +392,7 @@ Describe cada archivo del repositorio paso a paso, su propósito, responsabilida
 
 ## 7. Backend API — Suites de Pruebas Automatizadas (`apps/api/tests/`)
 
-- **Tecnología**: Vitest + Supertest (76 pruebas automatizadas, 100% pasando).
+- **Tecnología**: Vitest + Supertest (88 pruebas automatizadas, 100% pasando).
 1. `tests/health.test.ts` (2 tests):
    - Verifica respuesta 200 en `/api/v1/health` con conectividad a PostgreSQL.
    - Verifica respuesta 404 en rutas inexistentes.
@@ -423,6 +437,19 @@ Describe cada archivo del repositorio paso a paso, su propósito, responsabilida
    - Expiración dinámica reflejada como `EXPIRED`.
    - Listado propio (`/mine`) y listado general paginado.
    - Cierre y eliminación lógica de publicación (`status: CLOSED`).
+7. `tests/search-and-matches.test.ts` (12 tests):
+   - Búsqueda sin filtros con paginación obligatoria y solo publicaciones `ACTIVE`.
+   - Filtro jerárquico por categoría padre que incluye automáticamente sus subcategorías.
+   - Filtro por subcategoría exacta de material.
+   - Filtros combinados de tipo (`OFFER`), ciudad, localidad (`locationArea`) y rango de cantidad.
+   - Ordenamiento prioritario por publicaciones urgentes (`sortBy=urgent_first`).
+   - Reglas de visibilidad para publicaciones `EXPIRED` (ocultas a terceros, visibles para el dueño).
+   - Identificación de candidatos opuestos (`OFFER` vs. `NEED`) que superan el umbral ($\ge 40$ puntos).
+   - Exclusión de candidatos débiles por debajo del umbral de compatibilidad (< 40 puntos).
+   - Coincidencia bidireccional recíproca entre oferta y necesidad.
+   - Desglose transparente y auditable de factores en lenguaje claro (HU-08).
+   - Detalle de publicación con contador liviano `publicacionesCompatibles`.
+   - Bandeja de sugerencias agregada para el usuario autenticado (`GET /matches/my-suggestions`).
 
 ---
 

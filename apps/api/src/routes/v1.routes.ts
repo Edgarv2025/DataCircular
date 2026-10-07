@@ -5,6 +5,7 @@ import { usersRouter } from '../modules/users/users.routes';
 import { organizationsRouter } from '../modules/organizations/organizations.routes';
 import { catalogRouter } from '../modules/catalog/catalog.routes';
 import { publicationsRouter } from '../modules/publications/publications.routes';
+import { matchesRouter } from '../modules/matches/matches.routes';
 
 const v1Router = Router();
 
@@ -25,5 +26,8 @@ v1Router.use('/catalog', catalogRouter);
 
 // Módulo de Publicaciones de Oferta y Demanda (Fase 8)
 v1Router.use('/publications', publicationsRouter);
+
+// Módulo de Coincidencias y Sugerencias (Fase 9)
+v1Router.use('/matches', matchesRouter);
 
 export { v1Router };

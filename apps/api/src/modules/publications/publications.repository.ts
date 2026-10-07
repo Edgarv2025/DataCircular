@@ -5,6 +5,9 @@ import {
   CreatePublicationInput,
   UpdatePublicationInput,
   PublicationStatus,
+  SearchPublicationsQuery,
+  PublicationSearchResultDto,
+  SafeUserDto,
 } from '@data-circular/shared';
 
 export function toPublicationDto(pub: any): MaterialPublicationDto {
@@ -258,6 +261,169 @@ export class PublicationsRepository {
     return {
       data: pubs.map(toPublicationDto),
       total,
+    };
+  }
+
+  /**
+   * Búsqueda general con filtros combinables y reglas de visibilidad (RF-10, CU-06).
+   */
+  async search(
+    query: SearchPublicationsQuery,
+    user: SafeUserDto
+  ): Promise<PublicationSearchResultDto> {
+    const page = Math.max(1, query.page || 1);
+    const pageSize = Math.min(50, Math.max(1, query.pageSize || 20));
+    const skip = (page - 1) * pageSize;
+    const now = new Date();
+
+    // Sincronizar automáticamente publicaciones con expiresAt vencido (Fase 8 & 9)
+    await prisma.materialPublication.updateMany({
+      where: {
+        status: 'ACTIVE',
+        expiresAt: { lt: now },
+      },
+      data: {
+        status: 'EXPIRED',
+      },
+    }).catch(() => {});
+
+    const where: any = {};
+
+    // 1. Filtro por tipo de publicación (OFFER o NEED)
+    if (query.type) {
+      where.type = query.type;
+    }
+
+    // 2. Filtro jerárquico por categoría
+    if (query.categoryId) {
+      const category = await prisma.materialCategory.findUnique({
+        where: { id: query.categoryId },
+      });
+
+      if (category) {
+        if (category.parentId === null) {
+          // Categoría padre: incluir automáticamente todas sus subcategorías
+          const subcategories = await prisma.materialCategory.findMany({
+            where: { parentId: category.id, active: true },
+            select: { id: true },
+          });
+          const catIds = [category.id, ...subcategories.map((s) => s.id)];
+          where.categoryId = { in: catIds };
+        } else {
+          // Subcategoría: coincidencia exacta
+          where.categoryId = category.id;
+        }
+      } else {
+        where.categoryId = query.categoryId;
+      }
+    }
+
+    // 3. Filtro por ciudad y localidad/área (coincidencia parcial insensible a mayúsculas)
+    if (query.city) {
+      where.locationCity = {
+        contains: query.city.trim(),
+        mode: 'insensitive',
+      };
+    }
+    if (query.area) {
+      where.locationArea = {
+        contains: query.area.trim(),
+        mode: 'insensitive',
+      };
+    }
+
+    // 4. Filtro por rango de cantidad
+    if (query.minQuantity !== undefined || query.maxQuantity !== undefined) {
+      where.quantity = {};
+      if (query.minQuantity !== undefined) {
+        where.quantity.gte = query.minQuantity;
+      }
+      if (query.maxQuantity !== undefined) {
+        where.quantity.lte = query.maxQuantity;
+      }
+    }
+
+    // 5. Filtro por unidad de medida
+    if (query.unitId) {
+      where.unitId = query.unitId;
+    }
+
+    // 6. Filtro por urgencia
+    if (query.isUrgent !== undefined) {
+      where.isUrgent = query.isUrgent;
+    }
+
+    // 7. Reglas de visibilidad y estado
+    const requestedStatus = query.status || 'ACTIVE';
+
+    if (requestedStatus === 'ACTIVE') {
+      // Estado activo por defecto: excluir publicaciones borradas y expiradas
+      where.status = 'ACTIVE';
+      where.deletedAt = null;
+      where.AND = [
+        ...(where.AND || []),
+        {
+          OR: [
+            { expiresAt: null },
+            { expiresAt: { gt: now } },
+          ],
+        },
+      ];
+    } else {
+      // Si se pide explícitamente EXPIRED o CLOSED:
+      // Solo son visibles para su dueño o miembros autorizados de la organización dueña
+      where.status = requestedStatus;
+
+      if (user.role !== 'ADMIN') {
+        const memberships = await prisma.organizationMember.findMany({
+          where: { userId: user.id, status: 'ACTIVE' },
+          select: { organizationId: true },
+        });
+        const orgIds = memberships.map((m) => m.organizationId);
+
+        where.AND = [
+          ...(where.AND || []),
+          {
+            OR: [
+              { ownerUserId: user.id },
+              ...(orgIds.length > 0 ? [{ organizationId: { in: orgIds } }] : []),
+            ],
+          },
+        ];
+      }
+    }
+
+    // 8. Ordenamiento
+    const orderBy: any =
+      query.sortBy === 'urgent_first'
+        ? [{ isUrgent: 'desc' }, { createdAt: 'desc' }]
+        : [{ createdAt: 'desc' }];
+
+    // 9. Ejecución con conteo total
+    const [pubs, total] = await Promise.all([
+      prisma.materialPublication.findMany({
+        where,
+        include: {
+          ownerUser: true,
+          organization: true,
+          category: {
+            include: { parent: true },
+          },
+          unit: true,
+        },
+        orderBy,
+        skip,
+        take: pageSize,
+      }),
+      prisma.materialPublication.count({ where }),
+    ]);
+
+    return {
+      data: pubs.map(toPublicationDto),
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize) || 1,
     };
   }
 

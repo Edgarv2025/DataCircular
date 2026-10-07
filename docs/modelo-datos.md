@@ -220,4 +220,20 @@ Modela ofertas (`OFFER`) y necesidades (`NEED`) de materiales aprovechables gene
 | `20261004140000_add_organizations_and_memberships` | 2026-10-04 | Agrega tablas `organizations`, `roles`, `permissions`, `role_permissions` y `organization_members`. |
 | `20261005140000_add_material_catalog_and_publications` | 2026-10-05 | Agrega tablas `material_categories`, `units` y `material_publications` con enums `PublicationType` y `PublicationStatus`. |
 
+---
+
+## 8. Arquitectura de Coincidencias entre Publicaciones (Fase 9, RF-11, HU-08)
+
+Conforme a la sección 7.3 del documento de Requerimientos oficial:
+- **Sin tablas de preferencias de usuario**: El motor de coincidencias opera exclusivamente comparando **publicaciones activas** entre sí (`OFFER` frente a `NEED`). No se introducen tablas de "condiciones de coincidencia" ni preferencias de usuario fijas.
+- **Pre-filtrado relacional en PostgreSQL**: Antes de evaluar el scoring en memoria, la consulta en base de datos pre-filtra candidatos activos del tipo opuesto que compartan familia de material (subcategoría o categorías hermanas bajo el mismo `parent_id`) o misma ciudad (`location_city`), aprovechando los índices compuestos en PostgreSQL.
+- **Puntaje Explicable y Umbral Auditable (HU-08)**:
+  - Misma subcategoría exacta: **+50 puntos**.
+  - Misma categoría principal (padre común): **+20 puntos**.
+  - Misma ciudad o localidad: **+20 puntos**.
+  - Cantidad cubierta (oferta $\ge$ requerimiento en misma unidad): **+15 puntos**.
+  - Requerimiento prioritario o urgente: **+10 puntos**.
+  - Publicación reciente ($\le 7$ días): **+5 puntos**.
+  - **Umbral de corte**: $\ge 40$ puntos. Candidatos con menor puntaje se descartan para prevenir ruido. Cada coincidencia incluye sus factores en lenguaje claro.
+
 

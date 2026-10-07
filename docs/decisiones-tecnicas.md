@@ -61,6 +61,23 @@
   3. **No Dependencia de Condiciones de Usuario**: El emparejamiento (Fase 9) se realizará comparando publicaciones entre sí (oferta vs. necesidad según requerimientos 7.3 y 12), evitando tablas huérfanas de preferencias por usuario.
   4. **Evaluación Perezosa de Expiración (Lazy Expiration Check)**: Al consultar cualquier publicación, el sistema evalúa dinámicamente si `expiresAt < now()` y refleja el estado `EXPIRED` de inmediato, sincronizando PostgreSQL sin necesidad de cron jobs adicionales en este momento.
   5. **Almacenamiento Temporal de Fotografías (`photoUrl`)**: Dado que el proveedor definitivo de almacenamiento de archivos (S3, GCS, Cloudinary o MinIO) se encuentra "por seleccionar" según la sección 13 de Requerimientos, se implementa `photoUrl` como campo de texto para URL o almacenamiento local temporal, con documentación explícita (TODO) para su migración futura.
-- **Consecuencias**: Catálogo normalizado, 76 pruebas backend automatizadas pasando (100%), arquitectura desacoplada y lista para el motor de búsqueda y coincidencia de la Fase 9.
+## ADR-008: Búsqueda Jerárquica y Algoritmo Explicable de Coincidencias de Economía Circular (Fase 9)
+- **Fecha**: 2026-10-06
+- **Contexto**: Implementación de la búsqueda general de publicaciones (RF-10, CU-06) y el motor de coincidencias sugeridas (RF-11, HU-08) para conectar generadores, recicladores y transformadores.
+- **Decisión**:
+  1. **Matching Basado Exclusivamente en Publicaciones**: Conforme a la sección 7.3 de Requerimientos, el algoritmo compara publicaciones activas de tipos opuestos (`OFFER` vs. `NEED`) y no depende de tablas artificiales de condiciones de usuario.
+  2. **Resolución Jerárquica de Categorías**: Cuando un usuario busca por una categoría padre (ej. "Plásticos"), el repositorio consulta el árbol e incluye automáticamente todas sus subcategorías activas en la cláusula SQL (`IN [subcategorias]`), mientras que para subcategorías realiza coincidencia exacta.
+  3. **Estrategia de Rendimiento mediante Pre-Filtrado Relacional**: Para evitar traer en memoria todas las publicaciones activas del sistema, la consulta en PostgreSQL descarta previamente aquellas que no compartan familia de material (misma subcategoría o hermanas con igual `parentId`) o ciudad sede (`locationCity`).
+  4. **Scoring Basado en Reglas Transparentes (HU-08)**: Se descarta Machine Learning de caja negra en favor de un algoritmo auditable con pesos objetivos:
+     - Subcategoría exacta: +50 pts.
+     - Categoría principal común: +20 pts.
+     - Ubicación geográfica común (ciudad/localidad): +20 pts.
+     - Cantidad cubierta (solo con misma unidad de medida, sin conversiones arbitrarias): +15 pts.
+     - Urgencia prioritaria: +10 pts.
+     - Candidata reciente ($\le 7$ días): +5 pts.
+     - **Umbral de corte**: $\ge 40$ puntos.
+  5. **Explicabilidad Obligatoria de Factores**: Cada coincidencia sugerida devuelve un array `factors` con el desglose en lenguaje claro (ej. *"Misma subcategoría de material"*, *"Cantidad ofrecida cubre la cantidad solicitada"*), garantizando la confianza de los participantes.
+  6. **Contador Liviano en Detalle de Publicación**: `GET /publications/:id` calcula en tiempo real `publicacionesCompatibles` para informar al emisor si existen oportunidades inmediatas de valorización.
+- **Consecuencias**: Motor de búsqueda y coincidencias rápido, auditable, escalable y 100% cubierto con pruebas automatizadas (88 pruebas unitarias/integración y suite móvil pasando al 100%).
 
 

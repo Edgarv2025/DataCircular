@@ -341,7 +341,7 @@ Crea una oferta (`OFFER`) o necesidad (`NEED`) de material aprovechable.
 ```
 
 ### `GET /api/v1/publications/:id`
-Obtiene el detalle completo de una publicación, incluyendo categoría, unidad y datos de contacto públicos del emisor. Si `expiresAt` está en el pasado, el estado se evalúa dinámicamente como `EXPIRED`.
+Obtiene el detalle completo de una publicación, incluyendo categoría, unidad, datos de contacto públicos del emisor y el contador liviano de coincidencias potenciales `publicacionesCompatibles`. Si `expiresAt` está en el pasado, el estado se evalúa dinámicamente como `EXPIRED`.
 - **Acceso**: Privado (`Authorization: Bearer <accessToken>`).
 
 ### `PATCH /api/v1/publications/:id`
@@ -358,12 +358,124 @@ Lista las publicaciones propias creadas por el usuario autenticado con soporte d
 
 ### `GET /api/v1/publications`
 Listado general de publicaciones activas con paginación simple (`?page=1&limit=20`).
-*(Los filtros avanzados de búsqueda y motor de matching corresponden a la Fase 9).*
 - **Acceso**: Privado (`Authorization: Bearer <accessToken>`).
 
 ---
 
-## 7. Formato Estándar de Errores
+## 7. Búsqueda y Filtros de Publicaciones (Fase 9, RF-10, CU-06)
+
+### `GET /api/v1/publications/search`
+Búsqueda avanzada de publicaciones con filtros combinables, resolución de jerarquía de categorías y reglas de visibilidad.
+
+- **Acceso**: Privado (`Authorization: Bearer <accessToken>`).
+- **Parámetros de consulta (Query Parameters)**:
+  - `type`: `OFFER` \| `NEED` (opcional).
+  - `categoryId`: UUID (opcional). Si corresponde a una categoría padre, incluye automáticamente todas sus subcategorías activas; si es subcategoría, filtra exacto.
+  - `city`: Coincidencia parcial insensible a mayúsculas sobre `locationCity`.
+  - `area`: Coincidencia parcial insensible a mayúsculas sobre `locationArea` (ej. 'Fontibón', 'Suba').
+  - `minQuantity`: Cantidad mínima (número positivo).
+  - `maxQuantity`: Cantidad máxima (número positivo).
+  - `unitId`: UUID de la unidad de medida (ej. kg, ton).
+  - `isUrgent`: `true` \| `false` para filtrar por publicaciones urgentes.
+  - `status`: `ACTIVE` (por defecto). Si se solicita `EXPIRED` o `CLOSED`, solo es visible si el solicitante es el dueño, miembro de la organización dueña o administrador.
+  - `page`: Número de página (entero >= 1, defecto 1).
+  - `pageSize`: Elementos por página (entero 1 a 50, defecto 20).
+  - `sortBy`: `recent` (defecto, más recientes primero) \| `urgent_first` (urgentes primero, luego más recientes).
+
+- **Ejemplo de Respuesta (200 OK)**:
+```json
+{
+  "success": true,
+  "message": "Búsqueda de publicaciones realizada exitosamente",
+  "data": {
+    "data": [
+      {
+        "id": "e4a7a8d2-...",
+        "type": "OFFER",
+        "quantity": 500,
+        "locationCity": "Bogotá D.C.",
+        "locationArea": "Fontibón",
+        "isUrgent": false,
+        "status": "ACTIVE",
+        "category": { "name": "PET (botellas transparentes...)" },
+        "unit": { "abbreviation": "kg" }
+      }
+    ],
+    "total": 1,
+    "page": 1,
+    "pageSize": 20,
+    "totalPages": 1
+  },
+  "timestamp": "2026-10-06T18:00:00.000Z"
+}
+```
+
+---
+
+## 8. Motor de Coincidencias y Sugerencias (Fase 9, RF-11, HU-08)
+
+### `GET /api/v1/publications/:id/matches`
+Dado el ID de una publicación, calcula y devuelve candidatos activos del **TIPO OPUESTO** (`OFFER` vs. `NEED`) ordenados por puntaje de compatibilidad descendente.
+
+- **Acceso**: Privado (`Authorization: Bearer <accessToken>`).
+- **Algoritmo de Scoring y Factores**:
+  - Coincidencia de subcategoría exacta: **+50 puntos**.
+  - Coincidencia de categoría principal (mismo padre): **+20 puntos**.
+  - Misma ciudad o localidad: **+20 puntos**.
+  - Cantidad compatible (oferta cubre necesidad en misma unidad): **+15 puntos**.
+  - Requerimiento urgente marcado en alguna publicación: **+10 puntos**.
+  - Publicación candidata creada en los últimos 7 días: **+5 puntos**.
+  - **Umbral de corte**: >= 40 puntos. Candidatos con menor puntaje son excluidos.
+- **Ejemplo de Respuesta (200 OK)**:
+```json
+{
+  "success": true,
+  "message": "Coincidencias obtenidas exitosamente",
+  "data": [
+    {
+      "publicationId": "9b1deb4d-...",
+      "score": 90,
+      "factors": [
+        "Misma subcategoría de material",
+        "Misma localidad o zona geográfica",
+        "Cantidad ofrecida cubre la cantidad solicitada",
+        "Publicación candidata creada en los últimos 7 días"
+      ],
+      "publication": {
+        "id": "9b1deb4d-...",
+        "type": "NEED",
+        "quantity": 300,
+        "unit": { "abbreviation": "kg" }
+      }
+    }
+  ],
+  "timestamp": "2026-10-06T18:00:00.000Z"
+}
+```
+
+### `GET /api/v1/matches/my-suggestions`
+Devuelve las 5 mejores coincidencias para cada una de las publicaciones activas del usuario autenticado o de sus organizaciones.
+
+- **Acceso**: Privado (`Authorization: Bearer <accessToken>`).
+- **Ejemplo de Respuesta (200 OK)**:
+```json
+{
+  "success": true,
+  "message": "Bandeja de sugerencias obtenida exitosamente",
+  "data": [
+    {
+      "publicationId": "e4a7a8d2-...",
+      "publication": { ... },
+      "matches": [ ... ]
+    }
+  ],
+  "timestamp": "2026-10-06T18:00:00.000Z"
+}
+```
+
+---
+
+## 9. Formato Estándar de Errores
 ```json
 {
   "success": false,
