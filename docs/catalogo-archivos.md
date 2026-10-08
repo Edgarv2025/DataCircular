@@ -497,33 +497,58 @@ Describe cada archivo del repositorio paso a paso, su propósito, responsabilida
 - **`ErrorBanner.tsx`**: Banner de alertas para mensajes de error, éxito, advertencia o información.
 - **`LocalityPicker.tsx`**: Selector modal con las 20 localidades oficiales de Bogotá D.C. importadas directamente de `@data-circular/shared`.
 
-### 8.4 Pantallas y Navegación con Expo Router (`apps/mobile/app/`)
-- **`app/_layout.tsx`**: Layout raíz con `SafeAreaProvider`, `AuthProvider` y Stack de navegación general.
-- **`app/index.tsx` (Pantalla 1 - Bienvenida / Onboarding)**:
-  - Presentación distrital con sello de Fundación IMARA y Bogotá D.C.
-  - Muestra las 4 tipologías de actores (Generador, Reciclador, Transportador, Transformador).
-  - Botones de acceso directo a Registro e Inicio de Sesión.
-- **`app/(auth)/_layout.tsx`**: Layout del grupo de autenticación.
-- **`app/(auth)/login.tsx` (Pantalla 3 - Inicio de Sesión)**:
-  - Formulario con correo y contraseña.
-  - Manejo de estados de carga y mensajes de error.
-  - Redirección automática a `/(app)/profile` tras iniciar sesión.
-- **`app/(auth)/register.tsx` (Pantalla 2 - Registro)**:
-  - Formulario de captura: nombre completo, correo, contraseña con requisitos, confirmación de contraseña, teléfono celular colombiano (`+57`), selector de tipo de usuario y selector modal de localidad en Bogotá.
-  - Casilla de verificación de consentimiento de la Política de Tratamiento de Datos Personales (Ley 1581 de 2012).
-- **`app/(app)/_layout.tsx`**: Layout protegido que valida autenticación activa; redirige a `/(auth)/login` si no hay sesión.
-- **`app/(app)/profile.tsx` (Pantalla 4 y 6 - Perfil y Logout)**:
-  - Visualización del perfil del usuario (nombre, correo, celular, tipo de actor, rol en plataforma, estado, Bogotá D.C., moneda COP, identificador UUID).
-  - Botón de edición de perfil.
-  - Botón de cierre de sesión con diálogo de confirmación.
-  - Opción de desactivación lógica de cuenta con advertencia.
-- **`app/(app)/edit-profile.tsx` (Pantalla 5 - Edición de Perfil)**:
-  - Formulario prellenado para actualizar `fullName` y `phone`.
-  - Explicación de campos protegidos que requieren solicitud administrativa.
-- **`app/(app)/users.tsx`**:
-  - Panel administrativo exclusivo para usuarios con rol `ADMIN`.
-  - Búsqueda en vivo de usuarios por nombre o correo.
-  - Modal para crear usuarios, editar roles, tipos y estados, o aplicar borrado lógico/permanente.
+### 8.4 Sistema de Diseño y Tokens Centralizados (`apps/mobile/src/theme/`)
+- **`src/theme/tokens.ts`**: Tokens centralizados extraídos directamente de la maqueta (`maqueta.jpg`):
+  - Colores institucionales: cabecera oscura (`#1F4D36`), campos de login (`#244D38`), botón de acción verde (`#1F7A45`), fondo de chips (`#E4EEE4`), texto oscuro (`#102A1C`), badges urgentes (`#D90429`).
+  - Radios: squircles (18), tarjetas (16), píldoras (9999).
+  - Sombras y elevaciones para tarjetas, botones, cabeceras y botón flotante central (+).
+  - Área táctil mínima accesible de 44 pt.
+- **`src/theme/colors.ts`**: Mapeo retrocompatible sobre los tokens de diseño.
+
+### 8.5 Clientes de API Móvil (`apps/mobile/src/api/`)
+- **`src/api/client.ts`**: Wrapper HTTP tipado sobre `fetch` nativo con inyección automática de Bearer Token y manejo de errores `ApiError`.
+- **`src/api/auth.api.ts`**: Métodos de autenticación (`login`, `register`, `logout`, `refreshToken`, `getDataPolicy`).
+- **`src/api/users.api.ts`**: Métodos para perfil (`getMe`, `updateMe`, `deleteMe`) y administración de usuarios.
+- **`src/api/catalog.api.ts`**: Consulta del árbol de categorías (`getCategories`) y unidades de medida (`getUnits`).
+- **`src/api/publications.api.ts`**: Operaciones de publicaciones (`search`, `getById`, `create`, `update`, `close`, `getMine`).
+- **`src/api/matches.api.ts`**: Consulta de coincidencias por publicación (`getMatches`) y bandeja de sugerencias (`getMySuggestions`).
+- **`src/api/organizations.api.ts`**: Gestión de organizaciones, membresías, dictamen y radicación de certificación (`getMyOrganizations`, `getAllOrganizations`, `create`, `update`, `requestVerification`, `reviewVerification`, `getMembers`, `addMember`).
+
+### 8.6 Capa de Mocks y Control de Características (`apps/mobile/src/mocks/` y `config/`)
+- **`src/config/features.ts`**: Banderas de activación desacopladas (`USE_MOCKS_CHAT`, `USE_MOCKS_PROPOSALS`, `USE_MOCKS_OPERATIONS`, `USE_MOCKS_ADMIN_MODERATION`).
+- **`src/mocks/chat.mock.ts`**: Conversaciones simuladas y mensajes hilos para negociación circular (Fase 10).
+- **`src/mocks/proposals.mock.ts`**: Propuestas comerciales en pesos COP y puntos de entrega en Bogotá D.C. (Fase 11).
+- **`src/mocks/operations.mock.ts`**: Operaciones con trazabilidad de 5 etapas (Agendada, Pesaje, Evidencia, Recepción, Cierre) (Fase 12).
+- **`src/mocks/moderation.mock.ts`**: Indicadores agregados de impacto ambiental y reportes de moderación (Fase 13).
+
+### 8.7 Componentes Reutilizables de Interfaz (`apps/mobile/src/components/`)
+- **`src/components/BrandHeader.tsx`**: Cabecera institucional curva en verde bosque oscuro (`#1F4D36`) con título DATA_CIRCULAR, subtítulo de Fundación IMARA, soporte para botón atrás y slot de acciones derechas.
+- **`src/components/CircularSeal.tsx`**: Sellos circulares emblemáticos de sostenibilidad e impacto positivo observables en la base del login (Sostenibilidad, Reciclaje Circular, Impacto Positivo).
+- **`src/components/CategoryChip.tsx`**: Chip en squircle verde salvia (`#E4EEE4`) con íconos temáticos según tipo de material y etiqueta inferior legible.
+- **`src/components/MaterialCard.tsx`**: Tarjeta en cuadrícula de 2 columnas con imagen o fallback temático, badges de tipo y urgencia, cantidad/unidad técnica, pin de localidad de Bogotá y botón verde *"Ver detalle"*.
+- **`src/components/MatchCard.tsx`**: Tarjeta de coincidencia inteligente (Fase 9 / HU-08) con badge de compatibilidad porcentual y desglose auditable de factores.
+- **`src/components/FilterModal.tsx`**: Modal deslizante de filtros avanzados (tipo, categoría, localidad distrital, cantidad mínima/máxima, unidad, urgencia y ordenamiento).
+- **`src/components/BottomTabBar.tsx`**: Barra de navegación inferior con 5 elementos: Inicio, Publicar, botón flotante central (+) elevado con sombra, Chat con contador de mensajes no leídos, y Perfil.
+- **`src/components/MockBanner.tsx`**: Indicador discreto obligatorio para vistas o secciones que operan con datos simulados.
+- **`src/components/LocalityPicker.tsx`**: Selector modal de las 20 localidades oficiales de Bogotá D.C.
+- **`src/components/Button.tsx`**, **`Input.tsx`**, **`Card.tsx`**, **`ErrorBanner.tsx`**: Componentes base accesibles.
+
+### 8.8 Pantallas y Flujos de Navegación (`apps/mobile/app/`)
+- **`app/_layout.tsx`**: Enrutador raíz con inicialización de contexto y SafeArea.
+- **`app/index.tsx`**: Pantalla inicial de bienvenida distrital y presentación institucional.
+- **`app/(auth)/_layout.tsx`**: Layout del grupo de autenticación sin cabeceras nativas duplicadas.
+- **`app/(auth)/login.tsx`**: Pantalla de acceso rediseñada fielmente a `maqueta.jpg`: cabecera curva verde bosque, campos en verde bosque oscuro con íconos, botón de acción verde y sellos circulares de sostenibilidad en la base.
+- **`app/(auth)/register.tsx`**: Formulario de registro con tipología de actor, consentimiento expreso de política de datos (Ley 1581) y selección de localidad.
+- **`app/(auth)/forgot-password.tsx`**: Flujo de recuperación de contraseña institucional.
+- **`app/(app)/_layout.tsx`**: Layout autenticado con enrutamiento stack unificado y protección de rutas privadas.
+- **`app/(app)/index.tsx` (Inicio / Marketplace)**: Pantalla principal fiel a la maqueta con buscador integrado, carrusel horizontal de categorías, selector de Ofertas/Necesidades, sugerencias de coincidencias y cuadrícula de 2 columnas.
+- **`app/(app)/publish.tsx` (Publicar Materiales)**: Formulario de creación de oferta/demanda con catálogo jerárquico real y subpestaña de gestión de publicaciones propias ("Mis Publicaciones").
+- **`app/(app)/publication/[id].tsx` (Detalle de Publicación)**: Visualizador completo de material con especificaciones técnicas, información de actor verificado, contador de compatibles, desglose de matches y botón de contacto.
+- **`app/(app)/chat.tsx` (Negociación y Mensajería)**: Centro de interacción segmentado en Mensajes directos, Propuestas comerciales circulares y Operaciones de trazabilidad.
+- **`app/(app)/profile.tsx` (Mi Perfil)**: Datos personales del usuario, gestión real de organizaciones vinculadas (Fase 7), solicitud de certificación institucional, edición y cierre de sesión.
+- **`app/(app)/edit-profile.tsx`**: Edición de datos personales con persistencia real en PostgreSQL.
+- **`app/(app)/users.tsx`**: Panel de gestión de usuarios de plataforma para administradores.
+- **`app/(app)/admin.tsx`**: Panel de control distrital con dictamen de verificaciones institucionales (API real Fase 7), auditoría del catálogo de materiales e indicadores de impacto.
 
 ---
 

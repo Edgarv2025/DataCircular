@@ -9,7 +9,8 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
-import { Colors } from '../../src/theme/colors';
+import { Tokens } from '../../src/theme/tokens';
+import { BrandHeader } from '../../src/components/BrandHeader';
 import { Input } from '../../src/components/Input';
 import { Button } from '../../src/components/Button';
 import { Card } from '../../src/components/Card';
@@ -83,115 +84,128 @@ export default function EditProfileScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={styles.keyboardContainer}
-    >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
+    <View style={styles.container}>
+      <BrandHeader
+        title="Editar Perfil"
+        subtitle="Actualización de Datos • DATA_CIRCULAR"
+        showBack={true}
+        onBack={() => router.back()}
+        curved={true}
+      />
+
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.keyboardContainer}
       >
-        <Text style={styles.headerTitle}>Actualizar Datos Personales</Text>
-        <Text style={styles.headerSubtitle}>
-          Modifica tu información registrada en la red de Bogotá D.C.
-        </Text>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          <Text style={styles.headerTitle}>Actualizar Datos Personales</Text>
+          <Text style={styles.headerSubtitle}>
+            Modifica tu información registrada en la red de Bogotá D.C.
+          </Text>
 
-        <ErrorBanner message={errorMessage} type="error" />
-        <ErrorBanner message={successMessage} type="success" />
+          <ErrorBanner message={errorMessage} type="error" />
+          <ErrorBanner message={successMessage} type="success" />
 
-        <Card style={styles.card}>
-          <Input
-            label="Nombre Completo *"
-            value={fullName}
-            onChangeText={(text) => {
-              setFullName(text);
-              if (fieldErrors.fullName) setFieldErrors({ ...fieldErrors, fullName: '' });
-            }}
-            placeholder="Tu nombre completo"
-            autoCapitalize="words"
-            error={fieldErrors.fullName}
-          />
-
-          <Input
-            label="Teléfono Celular (Colombia)"
-            value={phone}
-            onChangeText={(text) => {
-              setPhone(text);
-              if (fieldErrors.phone) setFieldErrors({ ...fieldErrors, phone: '' });
-            }}
-            placeholder="310 123 4567"
-            prefix="+57"
-            keyboardType="phone-pad"
-            helperText="Número para coordinar recolecciones o entregas en Bogotá"
-            error={fieldErrors.phone}
-          />
-
-          {/* Campos no modificables por seguridad */}
-          <Input
-            label="Correo Electrónico (Protegido)"
-            value={user?.email || ''}
-            onChangeText={() => {}}
-            editable={false}
-            helperText="Por seguridad y auditoría institucional, el correo no puede cambiarse."
-          />
-
-          <Input
-            label="Rol en el Sistema (Protegido)"
-            value={user?.role === 'ADMIN' ? 'Administrador' : 'Usuario General'}
-            onChangeText={() => {}}
-            editable={false}
-            helperText="Los roles solo pueden ser modificados por la administración de Fundación IMARA."
-          />
-
-          <View style={styles.actionsRow}>
-            <Button
-              title="Guardar Cambios"
-              onPress={handleSave}
-              loading={loading}
-              variant="primary"
-              style={styles.saveButton}
+          <Card style={styles.card}>
+            <Input
+              label="Nombre Completo *"
+              value={fullName}
+              onChangeText={(text) => {
+                setFullName(text);
+                if (fieldErrors.fullName) setFieldErrors({ ...fieldErrors, fullName: '' });
+              }}
+              placeholder="Tu nombre completo"
+              autoCapitalize="words"
+              error={fieldErrors.fullName}
             />
 
-            <Button
-              title="Cancelar"
-              onPress={() => router.back()}
-              variant="outline"
-              disabled={loading}
+            <Input
+              label="Teléfono Celular (Colombia)"
+              value={phone}
+              onChangeText={(text) => {
+                setPhone(text);
+                if (fieldErrors.phone) setFieldErrors({ ...fieldErrors, phone: '' });
+              }}
+              placeholder="310 123 4567"
+              prefix="+57"
+              keyboardType="phone-pad"
+              helperText="Número para coordinar recolecciones o entregas en Bogotá"
+              error={fieldErrors.phone}
             />
-          </View>
-        </Card>
-      </ScrollView>
-    </KeyboardAvoidingView>
+
+            {/* Campos informativos no modificables */}
+            <Input
+              label="Correo Electrónico (No modificable)"
+              value={user?.email || ''}
+              onChangeText={() => {}}
+              editable={false}
+              helperText="El correo institucional es tu clave única de acceso"
+            />
+
+            <Input
+              label="Tipo de Usuario en el Ecosistema"
+              value={user?.userType || 'N/D'}
+              onChangeText={() => {}}
+              editable={false}
+            />
+
+            <View style={styles.buttonsRow}>
+              <Button
+                title="Cancelar"
+                onPress={() => router.back()}
+                variant="outline"
+                style={{ flex: 1, marginRight: 8 }}
+              />
+              <Button
+                title="Guardar Cambios"
+                onPress={handleSave}
+                loading={loading}
+                variant="primary"
+                style={{ flex: 1, marginLeft: 8 }}
+              />
+            </View>
+          </Card>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAF8',
+  },
   keyboardContainer: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   scrollContent: {
-    padding: 16,
+    padding: Tokens.spacing.lg,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '800',
-    color: Colors.primaryDark,
+    color: Tokens.colors.primaryDark,
     marginBottom: 4,
   },
   headerSubtitle: {
-    fontSize: 13,
-    color: Colors.textMuted,
+    fontSize: 12,
+    color: Tokens.colors.textMuted,
     marginBottom: 12,
   },
   card: {
-    padding: 18,
+    padding: 16,
+    borderRadius: Tokens.radii.card,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2EBE5',
+    ...Tokens.shadows.card,
   },
-  actionsRow: {
-    marginTop: 14,
-    gap: 8,
-  },
-  saveButton: {
-    marginBottom: 4,
+  buttonsRow: {
+    flexDirection: 'row',
+    marginTop: 16,
   },
 });

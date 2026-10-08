@@ -10,7 +10,6 @@ export default function AppLayout() {
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      // Redirigir a login si intenta acceder a rutas privadas sin sesión
       router.replace('/(auth)/login');
     }
   }, [isLoading, isAuthenticated]);
@@ -31,41 +30,20 @@ export default function AppLayout() {
   return (
     <Stack
       screenOptions={{
-        headerStyle: {
-          backgroundColor: Colors.primary,
-        },
-        headerTintColor: '#FFFFFF',
-        headerTitleStyle: {
-          fontWeight: '700',
-        },
-        headerBackTitle: 'Atrás',
+        headerShown: false,
         contentStyle: {
-          backgroundColor: Colors.background,
+          backgroundColor: '#FFFFFF',
         },
       }}
     >
-      <Stack.Screen
-        name="profile"
-        options={{
-          title: 'Mi Perfil • DATA_CIRCULAR',
-          headerShown: true,
-          headerBackVisible: false, // Pantalla principal de la app
-        }}
-      />
-      <Stack.Screen
-        name="edit-profile"
-        options={{
-          title: 'Editar Perfil',
-          headerShown: true,
-        }}
-      />
-      <Stack.Screen
-        name="users"
-        options={{
-          title: 'Administrar Usuarios',
-          headerShown: true,
-        }}
-      />
+      <Stack.Screen name="index" />
+      <Stack.Screen name="publish" />
+      <Stack.Screen name="publication/[id]" />
+      <Stack.Screen name="chat" />
+      <Stack.Screen name="profile" />
+      <Stack.Screen name="edit-profile" />
+      <Stack.Screen name="users" />
+      <Stack.Screen name="admin" />
     </Stack>
   );
 }
@@ -75,11 +53,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.background,
+    backgroundColor: '#FFFFFF',
   },
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: Colors.textMuted,
+    color: '#666666',
   },
 });

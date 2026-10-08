@@ -1,21 +1,34 @@
+import { Tokens } from './tokens';
+
 /**
  * Paleta de Colores Institucional - DATA_CIRCULAR & Fundación IMARA
- * Colores ecológicos de economía circular con alto contraste y accesibilidad.
+ * Integra los tokens extraídos directamente de la maqueta (maqueta.jpg)
+ * preservando compatibilidad con componentes previos.
  */
 export const Colors = {
-  primary: '#1B4332',         // Verde Bosque Profundo
-  primaryLight: '#2D6A4F',    // Verde Medio
-  primaryDark: '#081C15',     // Verde Oscuro
-  accent: '#52B788',          // Verde Esmeralda
-  accentLight: '#D8F3DC',     // Verde Menta Suave
-  background: '#F7F9F8',      // Fondo neutro cálido
-  card: '#FFFFFF',            // Blanco de superficie
-  text: '#1B262C',            // Texto principal
-  textMuted: '#52616B',       // Texto secundario / etiquetas
-  border: '#DDE5E0',          // Bordes de tarjetas e inputs
-  danger: '#E63946',          // Rojo de alerta / error
-  dangerLight: '#FFE3E5',     // Fondo suave de error
-  success: '#2A9D8F',         // Verde de confirmación
-  warning: '#F4A261',         // Ámbar de advertencia
+  // Claves heredadas compatibles
+  primary: Tokens.colors.actionGreen,     // #1F7A45 (Verde acción de botones)
+  primaryLight: '#2D6A4F',                // Verde Medio
+  primaryDark: Tokens.colors.headerDark,  // #1F4D36 (Verde bosque para cabeceras)
+  accent: Tokens.colors.actionGreen,
+  accentLight: Tokens.colors.chipBackground,
+  background: Tokens.colors.background,
+  card: Tokens.colors.surface,
+  text: Tokens.colors.textPrimary,
+  textMuted: Tokens.colors.textSecondary,
+  border: Tokens.colors.border,
+  danger: Tokens.colors.danger,
+  dangerLight: '#FFE3E5',
+  success: Tokens.colors.success,
+  warning: Tokens.colors.warning,
   inputBg: '#FFFFFF',
+
+  // Nuevas claves específicas de la maqueta
+  headerDark: Tokens.colors.headerDark,
+  inputDark: Tokens.colors.inputDark,
+  actionGreen: Tokens.colors.actionGreen,
+  chipBackground: Tokens.colors.chipBackground,
+  chipActive: Tokens.colors.chipActive,
+  surfaceAlt: Tokens.colors.surfaceAlt,
+  textOnDark: Tokens.colors.textOnDark,
 };

@@ -27,6 +27,8 @@ import { Card } from '../../src/components/Card';
 import { ErrorBanner } from '../../src/components/ErrorBanner';
 import { Input } from '../../src/components/Input';
 
+import { BrandHeader } from '../../src/components/BrandHeader';
+
 const USER_TYPES: { value: UserType; label: string }[] = [
   { value: 'GENERATOR', label: 'Generador' },
   { value: 'RECYCLER', label: 'Reciclador' },
@@ -211,6 +213,13 @@ export default function UsersScreen() {
 
   return (
     <View style={styles.screen}>
+      <BrandHeader
+        title="Administración de Usuarios"
+        subtitle="DATA_CIRCULAR • Control de Cuentas"
+        showBack={true}
+        onBack={() => router.back()}
+        curved={true}
+      />
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadUsers(true)} />}

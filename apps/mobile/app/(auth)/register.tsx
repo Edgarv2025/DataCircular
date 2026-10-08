@@ -11,7 +11,8 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
-import { Colors } from '../../src/theme/colors';
+import { Tokens } from '../../src/theme/tokens';
+import { BrandHeader } from '../../src/components/BrandHeader';
 import { Input } from '../../src/components/Input';
 import { Button } from '../../src/components/Button';
 import { Card } from '../../src/components/Card';
@@ -20,11 +21,11 @@ import { LocalityPicker } from '../../src/components/LocalityPicker';
 import { DataPolicyInfoDto, PASSWORD_REGEX, UserType, USER_TYPES } from '@data-circular/shared';
 import { AuthApi } from '../../src/api/auth.api';
 
-const USER_TYPE_OPTIONS: { value: UserType; label: string; detail: string }[] = [
-  { value: 'GENERATOR', label: 'Generador', detail: 'Ofrezco materiales' },
-  { value: 'RECYCLER', label: 'Reciclador', detail: 'Recupero materiales' },
-  { value: 'TRANSPORTER', label: 'Transportador', detail: 'Movilizo materiales' },
-  { value: 'TRANSFORMER', label: 'Transformador', detail: 'Aprovecho materiales' },
+const USER_TYPE_OPTIONS: { value: UserType; label: string; detail: string; icon: string }[] = [
+  { value: 'GENERATOR', label: 'Generador', detail: 'Ofrezco materiales', icon: '🏢' },
+  { value: 'RECYCLER', label: 'Reciclador', detail: 'Recupero materiales', icon: '🤝' },
+  { value: 'TRANSPORTER', label: 'Transportador', detail: 'Movilizo materiales', icon: '🚛' },
+  { value: 'TRANSFORMER', label: 'Transformador', detail: 'Aprovecho materiales', icon: '🏭' },
 ];
 
 export default function RegisterScreen() {
@@ -116,7 +117,6 @@ export default function RegisterScreen() {
 
     setLoading(true);
     try {
-      // Normalizar teléfono con formato Colombia si se proporcionó
       let normalizedPhone: string | undefined = undefined;
       if (phone.trim()) {
         const digits = phone.replace(/\D/g, '');
@@ -133,7 +133,6 @@ export default function RegisterScreen() {
       });
 
       if (result.success) {
-        // Redirigir a pantalla protegida del perfil
         router.replace('/(app)/profile');
       } else {
         setErrorMessage(result.error || 'No se pudo completar el registro.');
@@ -148,240 +147,238 @@ export default function RegisterScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={styles.keyboardContainer}
-    >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
+    <View style={styles.container}>
+      <BrandHeader
+        title="Crear Nueva Cuenta"
+        subtitle="Registro Distrital Bogotá D.C. • DATA_CIRCULAR"
+        showBack={true}
+        onBack={() => router.back()}
+        curved={true}
+      />
+
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.keyboardContainer}
       >
-        <View style={styles.topInfo}>
-          <Text style={styles.cityBadge}>📍 Registro Distrital Bogotá D.C.</Text>
-          <Text style={styles.pageTitle}>Crear Nueva Cuenta</Text>
-          <Text style={styles.pageSubtitle}>
-            Únete a la red de economía circular de Bogotá D.C.
-          </Text>
-        </View>
-
-        <ErrorBanner message={errorMessage} type="error" />
-
-        <Card style={styles.formCard}>
-          <Input
-            label="Nombre Completo *"
-            value={fullName}
-            onChangeText={(text) => {
-              setFullName(text);
-              if (fieldErrors.fullName) setFieldErrors({ ...fieldErrors, fullName: '' });
-            }}
-            placeholder="ej: María Rodríguez / Empresa Verde SAS"
-            autoCapitalize="words"
-            error={fieldErrors.fullName}
-          />
-
-          <Input
-            label="Correo Electrónico Institucional *"
-            value={email}
-            onChangeText={(text) => {
-              setEmail(text);
-              if (fieldErrors.email) setFieldErrors({ ...fieldErrors, email: '' });
-            }}
-            placeholder="ej: contacto@empresa.com.co"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            error={fieldErrors.email}
-          />
-
-          <Input
-            label="Teléfono Celular (Colombia)"
-            value={phone}
-            onChangeText={(text) => {
-              setPhone(text);
-              if (fieldErrors.phone) setFieldErrors({ ...fieldErrors, phone: '' });
-            }}
-            placeholder="310 123 4567"
-            prefix="+57"
-            keyboardType="phone-pad"
-            helperText="Número móvil para coordinación de recolección en Bogotá"
-            error={fieldErrors.phone}
-          />
-
-          <View style={styles.userTypeContainer}>
-            <Text style={styles.userTypeLabel}>Tipo de usuario *</Text>
-            <View style={styles.userTypeOptions}>
-              {USER_TYPE_OPTIONS.map((option) => {
-                const selected = userType === option.value;
-                return (
-                  <TouchableOpacity
-                    key={option.value}
-                    accessibilityRole="radio"
-                    accessibilityState={{ checked: selected }}
-                    onPress={() => {
-                      setUserType(option.value);
-                      if (fieldErrors.userType) setFieldErrors({ ...fieldErrors, userType: '' });
-                    }}
-                    style={[styles.userTypeOption, selected && styles.userTypeOptionSelected]}
-                  >
-                    <Text style={[styles.userTypeOptionTitle, selected && styles.userTypeOptionTitleSelected]}>
-                      {option.label}
-                    </Text>
-                    <Text style={styles.userTypeOptionDetail}>{option.detail}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            {fieldErrors.userType ? <Text style={styles.userTypeError}>{fieldErrors.userType}</Text> : null}
-          </View>
-
-          <LocalityPicker
-            selectedLocality={selectedLocality}
-            onSelect={(locality) => {
-              setSelectedLocality(locality);
-              if (fieldErrors.locality) setFieldErrors({ ...fieldErrors, locality: '' });
-            }}
-            error={fieldErrors.locality}
-          />
-
-          <Input
-            label="Contraseña de Seguridad *"
-            value={password}
-            onChangeText={(text) => {
-              setPassword(text);
-              if (fieldErrors.password) setFieldErrors({ ...fieldErrors, password: '' });
-            }}
-            placeholder="Mínimo 8 caracteres seguros"
-            secureTextEntry={true}
-            helperText="Debe contener mayúscula, minúscula, número y símbolo especial"
-            error={fieldErrors.password}
-          />
-
-          <Input
-            label="Confirmar Contraseña *"
-            value={confirmPassword}
-            onChangeText={(text) => {
-              setConfirmPassword(text);
-              if (fieldErrors.confirmPassword) setFieldErrors({ ...fieldErrors, confirmPassword: '' });
-            }}
-            placeholder="Repite tu contraseña"
-            secureTextEntry={true}
-            error={fieldErrors.confirmPassword}
-          />
-
-          <View style={styles.habeasDataBox}>
-            <Text style={styles.habeasDataText}>
-              Fundación IMARA informa que cuenta con una política institucional de tratamiento de datos personales.
-            </Text>
-            {dataPolicyInfo?.url ? (
-              <TouchableOpacity
-                accessibilityRole="link"
-                onPress={() => Linking.openURL(dataPolicyInfo.url!)}
-                style={styles.policyLink}
-              >
-                <Text style={styles.policyLinkText}>Consultar política (versión {dataPolicyInfo.version})</Text>
-              </TouchableOpacity>
-            ) : (
-              <Text style={styles.policyPendingText}>Enlace de consulta pendiente de configuración.</Text>
-            )}
-            <TouchableOpacity
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: dataPolicyAccepted }}
-              onPress={() => {
-                setDataPolicyAccepted(!dataPolicyAccepted);
-                if (fieldErrors.dataPolicyAccepted) {
-                  setFieldErrors({ ...fieldErrors, dataPolicyAccepted: '' });
-                }
-              }}
-              style={styles.policyConsentRow}
-            >
-              <View style={[styles.policyCheckbox, dataPolicyAccepted && styles.policyCheckboxChecked]}>
-                {dataPolicyAccepted ? <Text style={styles.policyCheckmark}>✓</Text> : null}
-              </View>
-              <Text style={styles.habeasDataText}>
-                Acepto expresamente el tratamiento de mis datos personales conforme a dicha política.
-              </Text>
-            </TouchableOpacity>
-            {fieldErrors.dataPolicyAccepted ? (
-              <Text style={styles.policyError}>{fieldErrors.dataPolicyAccepted}</Text>
-            ) : null}
-          </View>
-
-          <Button
-            title="Registrar Cuenta en DATA_CIRCULAR"
-            onPress={handleRegister}
-            loading={loading}
-            variant="primary"
-            style={styles.submitButton}
-          />
-        </Card>
-
-        <View style={styles.footerLinkContainer}>
-          <Text style={styles.footerLinkText}>¿Ya tienes una cuenta registrada?</Text>
-          <TouchableOpacity
-            onPress={() => router.push('/(auth)/login')}
-            style={styles.loginLink}
-          >
-            <Text style={styles.loginLinkHighlight}>Inicia sesión aquí</Text>
-          </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity
-          onPress={() => router.replace('/')}
-          style={styles.backHomeButton}
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.backHomeText}>← Volver a Bienvenida</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </KeyboardAvoidingView>
+          <View style={styles.topInfo}>
+            <Text style={styles.pageTitle}>Registro en DATA_CIRCULAR</Text>
+            <Text style={styles.pageSubtitle}>
+              Únete a la red colaborativa de economía circular en Bogotá D.C.
+            </Text>
+          </View>
+
+          <ErrorBanner message={errorMessage} type="error" />
+
+          <Card style={styles.formCard}>
+            <Input
+              label="Nombre Completo *"
+              value={fullName}
+              onChangeText={(text) => {
+                setFullName(text);
+                if (fieldErrors.fullName) setFieldErrors({ ...fieldErrors, fullName: '' });
+              }}
+              placeholder="ej: María Rodríguez / Empresa Verde SAS"
+              autoCapitalize="words"
+              error={fieldErrors.fullName}
+            />
+
+            <Input
+              label="Correo Electrónico Institucional *"
+              value={email}
+              onChangeText={(text) => {
+                setEmail(text);
+                if (fieldErrors.email) setFieldErrors({ ...fieldErrors, email: '' });
+              }}
+              placeholder="ej: contacto@empresa.com.co"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              error={fieldErrors.email}
+            />
+
+            <Input
+              label="Teléfono Celular (Colombia)"
+              value={phone}
+              onChangeText={(text) => {
+                setPhone(text);
+                if (fieldErrors.phone) setFieldErrors({ ...fieldErrors, phone: '' });
+              }}
+              placeholder="310 123 4567"
+              prefix="+57"
+              keyboardType="phone-pad"
+              helperText="Número móvil para coordinación de recolección en Bogotá"
+              error={fieldErrors.phone}
+            />
+
+            <View style={styles.userTypeContainer}>
+              <Text style={styles.userTypeLabel}>Tipo de usuario circular *</Text>
+              <View style={styles.userTypeOptions}>
+                {USER_TYPE_OPTIONS.map((option) => {
+                  const selected = userType === option.value;
+                  return (
+                    <TouchableOpacity
+                      key={option.value}
+                      accessibilityRole="radio"
+                      accessibilityState={{ checked: selected }}
+                      onPress={() => {
+                        setUserType(option.value);
+                        if (fieldErrors.userType) setFieldErrors({ ...fieldErrors, userType: '' });
+                      }}
+                      style={[styles.userTypeOption, selected && styles.userTypeOptionSelected]}
+                    >
+                      <Text style={styles.userTypeIcon}>{option.icon}</Text>
+                      <Text style={[styles.userTypeOptionTitle, selected && styles.userTypeOptionTitleSelected]}>
+                        {option.label}
+                      </Text>
+                      <Text style={styles.userTypeOptionDetail}>{option.detail}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              {fieldErrors.userType ? <Text style={styles.userTypeError}>{fieldErrors.userType}</Text> : null}
+            </View>
+
+            <LocalityPicker
+              selectedLocality={selectedLocality}
+              onSelect={(locality) => {
+                setSelectedLocality(locality);
+                if (fieldErrors.locality) setFieldErrors({ ...fieldErrors, locality: '' });
+              }}
+              error={fieldErrors.locality}
+            />
+
+            <Input
+              label="Contraseña de Seguridad *"
+              value={password}
+              onChangeText={(text) => {
+                setPassword(text);
+                if (fieldErrors.password) setFieldErrors({ ...fieldErrors, password: '' });
+              }}
+              placeholder="Mínimo 8 caracteres seguros"
+              secureTextEntry={true}
+              helperText="Debe contener mayúscula, minúscula, número y símbolo especial"
+              error={fieldErrors.password}
+            />
+
+            <Input
+              label="Confirmar Contraseña *"
+              value={confirmPassword}
+              onChangeText={(text) => {
+                setConfirmPassword(text);
+                if (fieldErrors.confirmPassword) setFieldErrors({ ...fieldErrors, confirmPassword: '' });
+              }}
+              placeholder="Repite tu contraseña"
+              secureTextEntry={true}
+              error={fieldErrors.confirmPassword}
+            />
+
+            <View style={styles.habeasDataBox}>
+              <Text style={styles.habeasDataText}>
+                Fundación IMARA informa que cuenta con una política institucional de tratamiento de datos personales conforme a la Ley 1581 de 2012.
+              </Text>
+              {dataPolicyInfo?.url ? (
+                <TouchableOpacity
+                  accessibilityRole="link"
+                  onPress={() => Linking.openURL(dataPolicyInfo.url!)}
+                  style={styles.policyLink}
+                >
+                  <Text style={styles.policyLinkText}>Consultar política (versión {dataPolicyInfo.version})</Text>
+                </TouchableOpacity>
+              ) : (
+                <Text style={styles.policyPendingText}>Enlace de consulta pendiente de configuración.</Text>
+              )}
+              <TouchableOpacity
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: dataPolicyAccepted }}
+                onPress={() => {
+                  setDataPolicyAccepted(!dataPolicyAccepted);
+                  if (fieldErrors.dataPolicyAccepted) {
+                    setFieldErrors({ ...fieldErrors, dataPolicyAccepted: '' });
+                  }
+                }}
+                style={styles.policyConsentRow}
+              >
+                <View style={[styles.policyCheckbox, dataPolicyAccepted && styles.policyCheckboxChecked]}>
+                  {dataPolicyAccepted ? <Text style={styles.policyCheckmark}>✓</Text> : null}
+                </View>
+                <Text style={styles.habeasDataText}>
+                  Acepto expresamente el tratamiento de mis datos personales conforme a dicha política.
+                </Text>
+              </TouchableOpacity>
+              {fieldErrors.dataPolicyAccepted ? (
+                <Text style={styles.policyError}>{fieldErrors.dataPolicyAccepted}</Text>
+              ) : null}
+            </View>
+
+            <Button
+              title="Registrar Cuenta en DATA_CIRCULAR"
+              onPress={handleRegister}
+              loading={loading}
+              variant="primary"
+              style={styles.submitButton}
+            />
+          </Card>
+
+          <View style={styles.footerLinkContainer}>
+            <Text style={styles.footerLinkText}>¿Ya tienes una cuenta registrada?</Text>
+            <TouchableOpacity
+              onPress={() => router.push('/(auth)/login')}
+              style={styles.loginLink}
+            >
+              <Text style={styles.loginLinkHighlight}>Inicia sesión aquí</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
   keyboardContainer: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   scrollContent: {
-    padding: 20,
-    justifyContent: 'center',
+    padding: Tokens.spacing.lg,
+    paddingBottom: 40,
   },
   topInfo: {
     alignItems: 'center',
-    marginVertical: 12,
-  },
-  cityBadge: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.primaryDark,
-    backgroundColor: Colors.accentLight,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginBottom: 8,
+    marginVertical: 10,
   },
   pageTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '800',
-    color: Colors.primaryDark,
+    color: Tokens.colors.primaryDark,
     marginBottom: 4,
   },
   pageSubtitle: {
-    fontSize: 13,
-    color: Colors.textMuted,
+    fontSize: 12,
+    color: Tokens.colors.textMuted,
     textAlign: 'center',
-    paddingHorizontal: 16,
   },
   formCard: {
     marginTop: 8,
-    padding: 20,
+    padding: 16,
+    borderRadius: Tokens.radii.card,
+    ...Tokens.shadows.card,
   },
   userTypeContainer: {
-    marginVertical: 6,
+    marginVertical: 8,
   },
   userTypeLabel: {
     fontSize: 13,
-    fontWeight: '600',
-    color: Colors.text,
-    marginBottom: 6,
+    fontWeight: '700',
+    color: Tokens.colors.textDark,
+    marginBottom: 8,
   },
   userTypeOptions: {
     flexDirection: 'row',
@@ -390,107 +387,112 @@ const styles = StyleSheet.create({
   },
   userTypeOption: {
     width: '48%',
-    minHeight: 70,
+    minHeight: 74,
     justifyContent: 'center',
     paddingHorizontal: 10,
     paddingVertical: 8,
     borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 8,
-    backgroundColor: Colors.inputBg,
+    borderColor: '#D7E3DC',
+    borderRadius: 12,
+    backgroundColor: '#F7FAF8',
   },
   userTypeOptionSelected: {
-    borderColor: Colors.primary,
+    borderColor: Tokens.colors.primary,
     borderWidth: 2,
-    backgroundColor: Colors.accentLight,
+    backgroundColor: Tokens.colors.accentLight,
+  },
+  userTypeIcon: {
+    fontSize: 16,
+    marginBottom: 2,
   },
   userTypeOptionTitle: {
-    color: Colors.text,
-    fontSize: 14,
+    color: Tokens.colors.textDark,
+    fontSize: 13,
     fontWeight: '700',
   },
   userTypeOptionTitleSelected: {
-    color: Colors.primaryDark,
+    color: Tokens.colors.primaryDark,
   },
   userTypeOptionDetail: {
-    color: Colors.textMuted,
-    fontSize: 11,
-    marginTop: 3,
+    color: Tokens.colors.textMuted,
+    fontSize: 10,
+    marginTop: 2,
   },
   userTypeError: {
-    color: Colors.danger,
+    color: Tokens.colors.urgentBg,
     fontSize: 12,
     marginTop: 4,
   },
   habeasDataBox: {
     backgroundColor: '#F0F5F2',
     borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 8,
-    padding: 10,
-    marginTop: 10,
-    marginBottom: 6,
+    borderColor: '#D7E3DC',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 12,
+    marginBottom: 8,
   },
   habeasDataText: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: Tokens.colors.textMuted,
     lineHeight: 16,
+    flex: 1,
   },
   policyLink: {
     alignSelf: 'flex-start',
     paddingVertical: 6,
   },
   policyLinkText: {
-    color: Colors.primary,
+    color: Tokens.colors.primary,
     fontSize: 12,
     fontWeight: '700',
     textDecorationLine: 'underline',
   },
   policyPendingText: {
-    color: Colors.textMuted,
-    fontSize: 12,
-    marginTop: 6,
+    color: Tokens.colors.textMuted,
+    fontSize: 11,
+    marginTop: 4,
   },
   policyConsentRow: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 8,
-    marginTop: 8,
+    marginTop: 10,
   },
   policyCheckbox: {
     alignItems: 'center',
-    borderColor: Colors.border,
-    borderRadius: 3,
-    borderWidth: 1,
-    height: 20,
+    borderColor: Tokens.colors.primary,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    height: 22,
+    width: 22,
     justifyContent: 'center',
-    width: 20,
+    marginRight: 10,
   },
   policyCheckboxChecked: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
+    backgroundColor: Tokens.colors.primary,
   },
   policyCheckmark: {
     color: '#FFFFFF',
     fontSize: 14,
-    fontWeight: '700',
-    lineHeight: 17,
+    fontWeight: '800',
   },
   policyError: {
-    color: Colors.danger,
+    color: Tokens.colors.urgentBg,
     fontSize: 12,
-    marginTop: 4,
+    marginTop: 6,
   },
   submitButton: {
-    marginTop: 14,
+    marginTop: 16,
+    borderRadius: Tokens.radii.pill,
+    height: 48,
   },
   footerLinkContainer: {
     alignItems: 'center',
     marginTop: 16,
   },
   footerLinkText: {
-    fontSize: 14,
-    color: Colors.textMuted,
+    fontSize: 13,
+    color: Tokens.colors.textMuted,
   },
   loginLink: {
     paddingVertical: 6,
@@ -498,16 +500,6 @@ const styles = StyleSheet.create({
   loginLinkHighlight: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.primary,
-  },
-  backHomeButton: {
-    alignItems: 'center',
-    marginTop: 12,
-    marginBottom: 20,
-    paddingVertical: 8,
-  },
-  backHomeText: {
-    fontSize: 13,
-    color: Colors.textMuted,
+    color: Tokens.colors.primary,
   },
 });

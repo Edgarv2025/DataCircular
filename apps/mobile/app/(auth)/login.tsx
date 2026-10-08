@@ -5,16 +5,17 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
-import { Colors } from '../../src/theme/colors';
-import { Input } from '../../src/components/Input';
+import { Tokens } from '../../src/theme/tokens';
+import { BrandHeader } from '../../src/components/BrandHeader';
 import { Button } from '../../src/components/Button';
-import { Card } from '../../src/components/Card';
 import { ErrorBanner } from '../../src/components/ErrorBanner';
+import { CircularSeal, DEFAULT_CIRCULAR_SEALS } from '../../src/components/CircularSeal';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -22,6 +23,7 @@ export default function LoginScreen() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
@@ -33,7 +35,7 @@ export default function LoginScreen() {
     if (!trimmedEmail) {
       errors.email = 'El correo electrónico es requerido';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-      errors.email = 'Ingresa un correo electrónico válido (ej: usuario@ejemplo.com)';
+      errors.email = 'Ingresa un correo electrónico válido';
     }
 
     if (!password) {
@@ -59,9 +61,9 @@ export default function LoginScreen() {
       });
 
       if (result.success) {
-        router.replace(result.user?.role === 'ADMIN' ? '/(app)/users' : '/(app)/profile');
+        router.replace(result.user?.role === 'ADMIN' ? '/(app)/admin' : '/(app)');
       } else {
-        setErrorMessage(result.error || 'Credenciales inválidas o cuenta no encontrada.');
+        setErrorMessage(result.error || 'Credenciales inválidas o cuenta inactiva.');
       }
     } catch (err: any) {
       setErrorMessage(
@@ -73,148 +75,253 @@ export default function LoginScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={styles.keyboardContainer}
-    >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
+    <View style={styles.container}>
+      {/* Cabecera institucional curva fiel a maqueta.jpg */}
+      <BrandHeader curved={true} />
+
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.keyboardContainer}
       >
-        {/* Banner Territorial */}
-        <View style={styles.topInfo}>
-          <Text style={styles.cityBadge}>📍 Sistema Distrital Bogotá D.C.</Text>
-          <Text style={styles.pageTitle}>Acceso a la Plataforma</Text>
-          <Text style={styles.pageSubtitle}>
-            Ingresa con tus credenciales institucionales de DATA_CIRCULAR
-          </Text>
-        </View>
-
-        {/* Banner de Errores del Servidor o Red */}
-        <ErrorBanner message={errorMessage} type="error" />
-
-        <Card style={styles.formCard}>
-          <Input
-            label="Correo Electrónico"
-            value={email}
-            onChangeText={(text) => {
-              setEmail(text);
-              if (fieldErrors.email) setFieldErrors({ ...fieldErrors, email: undefined });
-            }}
-            placeholder="ej: contacto@imara.org"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            error={fieldErrors.email}
-          />
-
-          <Input
-            label="Contraseña"
-            value={password}
-            onChangeText={(text) => {
-              setPassword(text);
-              if (fieldErrors.password) setFieldErrors({ ...fieldErrors, password: undefined });
-            }}
-            placeholder="Ingresa tu contraseña"
-            secureTextEntry={true}
-            error={fieldErrors.password}
-          />
-
-          <Button
-            title="Iniciar Sesión"
-            onPress={handleLogin}
-            loading={loading}
-            variant="primary"
-            style={styles.loginButton}
-          />
-        </Card>
-
-        {/* Enlace para registro */}
-        <View style={styles.footerLinkContainer}>
-          <Text style={styles.footerLinkText}>¿Aún no tienes una cuenta en Bogotá?</Text>
-          <TouchableOpacity
-            onPress={() => router.push('/(auth)/register')}
-            style={styles.registerLink}
-          >
-            <Text style={styles.registerLinkHighlight}>Regístrate aquí gratis</Text>
-          </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity
-          onPress={() => router.replace('/')}
-          style={styles.backHomeButton}
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.backHomeText}>← Volver a Bienvenida</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </KeyboardAvoidingView>
+          {/* Título de bienvenida */}
+          <View style={styles.introSection}>
+            <Text style={styles.welcomeTitle}>Iniciar Sesión</Text>
+            <Text style={styles.welcomeSubtitle}>
+              Plataforma Distrital de Economía Circular • Bogotá D.C.
+            </Text>
+          </View>
+
+          {/* Banner de error */}
+          <ErrorBanner message={errorMessage} type="error" />
+
+          {/* Formulario con campos dark green pill (#244D38) según maqueta */}
+          <View style={styles.formContainer}>
+            {/* Campo Email */}
+            <View style={[styles.inputPill, Boolean(fieldErrors.email) && styles.inputError]}>
+              <Text style={styles.inputIcon}>✉️</Text>
+              <TextInput
+                value={email}
+                onChangeText={(text) => {
+                  setEmail(text);
+                  if (fieldErrors.email) setFieldErrors({ ...fieldErrors, email: undefined });
+                }}
+                placeholder="Correo electrónico institucional"
+                placeholderTextColor="#A1C7B2"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                style={styles.textInput}
+              />
+            </View>
+            {fieldErrors.email ? (
+              <Text style={styles.errorText}>{fieldErrors.email}</Text>
+            ) : null}
+
+            {/* Campo Password */}
+            <View style={[styles.inputPill, Boolean(fieldErrors.password) && styles.inputError]}>
+              <Text style={styles.inputIcon}>🔒</Text>
+              <TextInput
+                value={password}
+                onChangeText={(text) => {
+                  setPassword(text);
+                  if (fieldErrors.password) setFieldErrors({ ...fieldErrors, password: undefined });
+                }}
+                placeholder="Contraseña"
+                placeholderTextColor="#A1C7B2"
+                secureTextEntry={!showPassword}
+                style={styles.textInput}
+              />
+              <TouchableOpacity
+                onPress={() => setShowPassword(!showPassword)}
+                style={styles.eyeToggle}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.eyeToggleText}>{showPassword ? '🙈' : '👁️'}</Text>
+              </TouchableOpacity>
+            </View>
+            {fieldErrors.password ? (
+              <Text style={styles.errorText}>{fieldErrors.password}</Text>
+            ) : null}
+
+            {/* Olvidé contraseña */}
+            <TouchableOpacity
+              onPress={() => router.push('/(auth)/forgot-password')}
+              style={styles.forgotPasswordButton}
+            >
+              <Text style={styles.forgotPasswordText}>¿Olvidaste tu contraseña?</Text>
+            </TouchableOpacity>
+
+            {/* Botón Iniciar Sesión en verde vibrante (#1F7A45) */}
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={handleLogin}
+              disabled={loading}
+              style={[styles.loginButton, loading && styles.loginButtonDisabled]}
+            >
+              <Text style={styles.loginButtonText}>
+                {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Registro */}
+            <View style={styles.registerRow}>
+              <Text style={styles.registerPrompt}>¿No tienes una cuenta aún? </Text>
+              <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
+                <Text style={styles.registerLink}>Regístrate aquí</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Sellos circulares inferiores de sostenibilidad (maqueta.jpg) */}
+          <View style={styles.sealsContainer}>
+            <View style={styles.sealsRow}>
+              {DEFAULT_CIRCULAR_SEALS.map((seal, index) => (
+                <CircularSeal
+                  key={index}
+                  icon={seal.icon}
+                  title={seal.title}
+                  subtitle={seal.subtitle}
+                  size={64}
+                />
+              ))}
+            </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
   keyboardContainer: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   scrollContent: {
-    padding: 20,
-    justifyContent: 'center',
+    paddingHorizontal: Tokens.spacing.lg,
+    paddingTop: Tokens.spacing.md,
+    paddingBottom: Tokens.spacing.xl,
+    justifyContent: 'space-between',
+    minHeight: '80%',
   },
-  topInfo: {
+  introSection: {
     alignItems: 'center',
-    marginVertical: 14,
+    marginVertical: 12,
   },
-  cityBadge: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.primaryDark,
-    backgroundColor: Colors.accentLight,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginBottom: 8,
-  },
-  pageTitle: {
+  welcomeTitle: {
     fontSize: 22,
     fontWeight: '800',
-    color: Colors.primaryDark,
-    marginBottom: 4,
+    color: Tokens.colors.primaryDark,
+    letterSpacing: 0.5,
   },
-  pageSubtitle: {
-    fontSize: 13,
-    color: Colors.textMuted,
+  welcomeSubtitle: {
+    fontSize: 12,
+    color: Tokens.colors.textMuted,
     textAlign: 'center',
-    paddingHorizontal: 16,
+    marginTop: 4,
   },
-  formCard: {
-    marginTop: 8,
-    padding: 20,
+  formContainer: {
+    marginTop: 10,
+    width: '100%',
+  },
+  inputPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Tokens.colors.loginInputBg,
+    borderRadius: Tokens.radii.pill,
+    height: 52,
+    paddingHorizontal: 16,
+    marginVertical: 6,
+    borderWidth: 1,
+    borderColor: '#2F6146',
+  },
+  inputError: {
+    borderColor: Tokens.colors.urgentBg,
+    borderWidth: 1.5,
+  },
+  inputIcon: {
+    fontSize: 18,
+    marginRight: 10,
+  },
+  textInput: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontSize: 15,
+    height: '100%',
+  },
+  eyeToggle: {
+    padding: 6,
+  },
+  eyeToggleText: {
+    fontSize: 16,
+  },
+  errorText: {
+    color: Tokens.colors.urgentBg,
+    fontSize: 11,
+    marginLeft: 16,
+    marginBottom: 4,
+    fontWeight: '600',
+  },
+  forgotPasswordButton: {
+    alignSelf: 'flex-end',
+    marginTop: 6,
+    marginBottom: 16,
+    paddingVertical: 4,
+  },
+  forgotPasswordText: {
+    fontSize: 12,
+    color: Tokens.colors.primaryDark,
+    fontWeight: '600',
   },
   loginButton: {
-    marginTop: 16,
-  },
-  footerLinkContainer: {
+    backgroundColor: Tokens.colors.primary,
+    height: 50,
+    borderRadius: Tokens.radii.pill,
     alignItems: 'center',
-    marginTop: 20,
+    justifyContent: 'center',
+    ...Tokens.shadows.card,
   },
-  footerLinkText: {
-    fontSize: 14,
-    color: Colors.textMuted,
+  loginButtonDisabled: {
+    opacity: 0.65,
+  },
+  loginButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  registerRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 18,
+  },
+  registerPrompt: {
+    fontSize: 13,
+    color: Tokens.colors.textMuted,
   },
   registerLink: {
-    paddingVertical: 6,
-  },
-  registerLinkHighlight: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Colors.primary,
-  },
-  backHomeButton: {
-    alignItems: 'center',
-    marginTop: 16,
-    paddingVertical: 8,
-  },
-  backHomeText: {
     fontSize: 13,
-    color: Colors.textMuted,
+    fontWeight: '700',
+    color: Tokens.colors.primary,
+  },
+  sealsContainer: {
+    marginTop: 30,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#EEF3F0',
+    alignItems: 'center',
+  },
+  sealsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'flex-start',
   },
 });
