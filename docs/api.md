@@ -475,7 +475,114 @@ Devuelve las 5 mejores coincidencias para cada una de las publicaciones activas 
 
 ---
 
-## 9. Formato Estándar de Errores
+## 9. Módulo de Conversaciones, Mensajes y Propuestas (Fase 10 - RF-12, RF-13, CU-07)
+
+Todas las rutas de este módulo requieren token JWT (`Authorization: Bearer <accessToken>`). Se rigen bajo la política estricta de privacidad: ninguna respuesta de conversación, mensaje o propuesta expone email, teléfono ni datos de contacto privados de la contraparte.
+
+### `POST /api/v1/conversations`
+Inicia o recupera una conversación asociada a una publicación. Idempotente: si ya existe una conversación entre la publicación y el usuario iniciador, devuelve la existente.
+
+- **Body**:
+```json
+{
+  "publicationId": "e4a7a8d2-...",
+  "organizationId": "550e8400-...", // opcional, si actúa en nombre de organización
+  "initialMessage": "Hola, estoy interesado en el material." // opcional
+}
+```
+- **Validaciones**:
+  - No permite contactar publicaciones propias ni de la propia organización (400 `CANNOT_CONTACT_OWN_PUBLICATION` / `CANNOT_CONTACT_OWN_ORGANIZATION`).
+  - No permite iniciar conversaciones sobre publicaciones cerradas, pausadas o expiradas (409 `PUBLICATION_NOT_ACTIVE`).
+  - Si actúa por organización, el usuario debe tener membresía activa con rol `OWNER`, `ADMIN` u `OPERATOR` (403 `FORBIDDEN` para `MEMBER`).
+- **Respuesta (201 Created o 200 OK)**: Retorna `ConversationDto` sanitizado.
+
+### `GET /api/v1/conversations`
+Bandeja de conversaciones del usuario autenticado (personales y de sus organizaciones).
+
+- **Query Parameters**:
+  - `archived`: boolean (`true` para archivadas, `false` para activas, default `false`).
+  - `status`: `OPEN | ARCHIVED | BLOCKED`.
+  - `page`, `pageSize`: paginación (default page=1, pageSize=20).
+- **Orden**: `lastMessageAt DESC`, `createdAt DESC`.
+- **Respuesta (200 OK)**: Lista paginada con contraparte sanitizada, resumen de publicación, último mensaje, propuesta activa y `unreadCount`.
+
+### `GET /api/v1/conversations/unread-count`
+Devuelve el conteo consolidado de mensajes no leídos en todas las conversaciones abiertas del usuario.
+
+- **Respuesta (200 OK)**: `{ "unreadCount": 3 }`.
+
+### `GET /api/v1/conversations/:id`
+Detalle completo de una conversación. Marca automáticamente la lectura (`lastReadAt = now()`) para el usuario autenticado.
+
+- **Autorización**: Solo participantes directos o miembros autorizados de las organizaciones participantes (403 `FORBIDDEN` para terceros).
+- **Respuesta (200 OK)**: Retorna `ConversationDto` con publicación, contraparte sanitizada, último mensaje y propuesta activa.
+
+### `PATCH /api/v1/conversations/:id/archive`
+Archiva o desarchiva una conversación para el participante de forma independiente sin afectar la bandeja de la contraparte.
+
+- **Body**: `{ "archived": true }` (o `false` para desarchivar).
+- **Respuesta (200 OK)**: `{ "success": true, "archived": true }`.
+
+### `GET /api/v1/conversations/:id/messages`
+Lista el historial de mensajes de la conversación en orden cronológico. Marca lectura (`lastReadAt = now()`).
+
+- **Query Parameters**: `page` (default 1), `pageSize` (default 50, máx 100).
+- **Respuesta (200 OK)**: Lista paginada de `MessageDto` (`TEXT` y `SYSTEM`), con `isMine: boolean`. Sin datos de contacto privados.
+
+### `POST /api/v1/conversations/:id/messages`
+Envía un mensaje de texto dentro de una conversación.
+
+- **Body**: `{ "body": "Texto del mensaje..." }` (1 a 2000 caracteres).
+- **Restricciones**:
+  - Rechaza mensajes si la publicación asociada está cerrada o expirada (409 `PUBLICATION_CLOSED`).
+  - Rechaza si la conversación está bloqueada (403 `CONVERSATION_BLOCKED`).
+  - Rate limiting anti-spam: máximo 30 mensajes por minuto por usuario en la conversación (429 `RATE_LIMIT_EXCEEDED`).
+  - Desarchiva automáticamente la conversación para el remitente y actualiza `lastMessageAt`.
+- **Respuesta (201 Created)**: Retorna `MessageDto`.
+
+### `POST /api/v1/conversations/:id/proposals`
+Formaliza una propuesta formal o contrapropuesta en la negociación.
+
+- **Body**:
+```json
+{
+  "quantity": 400.0,
+  "unitId": "uuid-de-unidad",
+  "terms": "Retiro este viernes a las 10:00 AM en camión propio.",
+  "parentProposalId": "uuid-opcional-si-es-contrapropuesta",
+  "organizationId": "uuid-opcional"
+}
+```
+- **Reglas**:
+  - En una conversación solo puede existir a lo sumo UNA propuesta en estado `PENDING`.
+  - Si ya existía una propuesta `PENDING`, la anterior pasa automáticamente a `SUPERSEDED` dentro de la transacción atómica.
+  - Genera un mensaje de sistema (`SYSTEM`) en el hilo de chat documentando la propuesta o contrapropuesta.
+  - No permite nuevas propuestas si la negociación ya tiene una propuesta en estado `ACCEPTED` (409 `NEGOTIATION_ALREADY_ACCEPTED`).
+- **Respuesta (201 Created)**: Retorna `ProposalDto` con estado `PENDING`.
+
+### `POST /api/v1/proposals/:id/accept`
+Acepta formalmente una propuesta pendiente.
+
+- **Reglas**:
+  - Solo puede responder la contraparte; el proponente NO puede auto-aceptar (403 `CANNOT_RESPOND_OWN_PROPOSAL`).
+  - Debe estar en estado `PENDING` (409 si ya fue aceptada, rechazada o superada).
+  - Control de concurrencia atómico mediante transacción (`status === 'PENDING'`).
+  - Actualiza a `ACCEPTED`, registra `respondedByUserId` y `respondedAt`.
+  - Genera mensaje de sistema (`SYSTEM`) en el chat.
+- **Respuesta (200 OK)**: Retorna `ProposalDto` en estado `ACCEPTED`.
+
+### `POST /api/v1/proposals/:id/reject`
+Rechaza formalmente una propuesta pendiente.
+
+- **Reglas**:
+  - Solo puede responder la contraparte; el proponente NO puede auto-rechazar (403).
+  - Actualiza a `REJECTED`, registra `respondedByUserId` y `respondedAt`.
+  - Genera mensaje de sistema (`SYSTEM`) en el chat.
+- **Respuesta (200 OK)**: Retorna `ProposalDto` en estado `REJECTED`.
+
+---
+
+## 10. Formato Estándar de Errores
 ```json
 {
   "success": false,
@@ -487,3 +594,4 @@ Devuelve las 5 mejores coincidencias para cada una de las publicaciones activas 
   "timestamp": "2026-09-27T18:00:00.000Z"
 }
 ```
+

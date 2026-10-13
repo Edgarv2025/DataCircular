@@ -5,8 +5,8 @@
  * inmediatamente el cliente al endpoint real sin modificar las pantallas.
  */
 export const FeatureFlags = {
-  USE_MOCKS_CHAT: true,
-  USE_MOCKS_PROPOSALS: true,
+  USE_MOCKS_CHAT: false,
+  USE_MOCKS_PROPOSALS: false,
   USE_MOCKS_OPERATIONS: true,
   USE_MOCKS_ADMIN_MODERATION: true,
 };

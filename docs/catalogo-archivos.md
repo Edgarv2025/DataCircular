@@ -379,12 +379,34 @@ Describe cada archivo del repositorio paso a paso, su propósito, responsabilida
   - `matches.controller.ts`: Controladores HTTP para `/publications/:id/matches` y `/matches/my-suggestions`.
   - `matches.routes.ts`: Enrutador montado en `/api/v1/matches`.
 
-### 6.8 Módulo Dashboard (`modules/dashboard/`)
+### 6.8 Módulo de Conversaciones, Mensajes y Propuestas (`modules/conversations/`) — Fase 10 (RF-12, RF-13, CU-07)
+- **Archivos**:
+  - `conversations.repository.ts`:
+    - Capa de acceso a datos Prisma para conversaciones, mensajes y propuestas.
+    - Idempotencia en creación mediante clave única `(publication_id, initiator_user_id)`.
+    - Sanitización estricta de privacidad: proyecta `toConversationDto`, `toMessageDto` y `toProposalDto` excluyendo correos, teléfonos y datos de contacto privados.
+    - Transacciones atómicas con control de concurrencia para creación y respuesta de propuestas.
+    - Conteo eficiente de mensajes no leídos y actualización de estados independientes (`ConversationParticipantState`).
+  - `conversations.service.ts`:
+    - Reglas de dominio y validaciones:
+      - Impide contactar publicaciones propias o de la propia organización (400 Bad Request).
+      - Rechaza inicio de conversaciones sobre publicaciones cerradas o expiradas (409 Conflict).
+      - Autorización multitenant por membresía y roles (`OWNER`, `ADMIN`, `OPERATOR`; rechaza escritura a `MEMBER` con 403).
+      - Rate limiting anti-spam de 30 mensajes por minuto por usuario en cada conversación (429 Too Many Requests).
+      - Garantiza que a lo sumo exista una propuesta `PENDING` por conversación; al presentar una contrapropuesta, la anterior pasa a `SUPERSEDED` y se emite un mensaje `SYSTEM`.
+      - Impide que el proponente auto-acepte o auto-rechace su propia propuesta (403 Forbidden).
+      - Cierra la negociación para nuevas propuestas una vez se acepta una (`ACCEPTED`).
+  - `conversations.controller.ts`:
+    - Controladores HTTP para `/conversations` (iniciar, detalle, bandeja, archivo, conteo no leídos, mensajes y propuestas) y `/proposals/:id/accept`, `/proposals/:id/reject`.
+  - `conversations.routes.ts`:
+    - Enrutadores Express `conversationsRouter` y `proposalsRouter` protegidos con `authenticateToken`.
+
+### 6.9 Módulo Dashboard (`modules/dashboard/`)
 - **Archivos**: `dashboard.routes.ts`
 - **Propósito**: Consola web servida en la raíz `GET /` con interfaz HTML interactiva para pruebas manuales rápidas de salud, registro y login desde el navegador.
 
-### 6.9 Enrutamiento Principal y Servidor
-- **`apps/api/src/routes/v1.routes.ts`**: Enrutador central que monta `/health`, `/auth`, `/users`, `/organizations`, `/catalog`, `/publications` y `/matches` bajo el prefijo común `/api/v1`.
+### 6.10 Enrutamiento Principal y Servidor
+- **`apps/api/src/routes/v1.routes.ts`**: Enrutador central que monta `/health`, `/auth`, `/users`, `/organizations`, `/catalog`, `/publications`, `/matches`, `/conversations` y `/proposals` bajo el prefijo común `/api/v1`.
 - **`apps/api/src/app.ts`**: Fábrica de la aplicación Express (`createApp`) configurando Helmet, CORS dinámico, parsers JSON y middlewares de error.
 - **`apps/api/src/server.ts`**: Punto de entrada del proceso. Conecta a PostgreSQL, arranca el servidor HTTP en el puerto configurado y registra manejadores para Graceful Shutdown (`SIGTERM`, `SIGINT`).
 
@@ -392,7 +414,7 @@ Describe cada archivo del repositorio paso a paso, su propósito, responsabilida
 
 ## 7. Backend API — Suites de Pruebas Automatizadas (`apps/api/tests/`)
 
-- **Tecnología**: Vitest + Supertest (88 pruebas automatizadas, 100% pasando).
+- **Tecnología**: Vitest + Supertest (110 pruebas automatizadas, 100% pasando).
 1. `tests/health.test.ts` (2 tests):
    - Verifica respuesta 200 en `/api/v1/health` con conectividad a PostgreSQL.
    - Verifica respuesta 404 en rutas inexistentes.
@@ -450,6 +472,26 @@ Describe cada archivo del repositorio paso a paso, su propósito, responsabilida
    - Desglose transparente y auditable de factores en lenguaje claro (HU-08).
    - Detalle de publicación con contador liviano `publicacionesCompatibles`.
    - Bandeja de sugerencias agregada para el usuario autenticado (`GET /matches/my-suggestions`).
+8. `tests/conversations-and-proposals.test.ts` (22 tests) — Fase 10:
+   - Iniciar conversación con mensaje inicial sobre publicación ajena (201 Created).
+   - Idempotencia en apertura de chat (reutiliza conversación existente con 200 OK).
+   - Rechazo de contacto a publicación propia o de la propia organización (400 Bad Request).
+   - Rechazo de inicio de conversación sobre publicaciones cerradas o expiradas (409 Conflict).
+   - Consulta de bandeja de conversaciones con resumen de publicación y conteo de no leídos.
+   - Verificación estricta de privacidad: ausencia absoluta de emails y teléfonos de la contraparte en respuestas.
+   - Control de acceso: bloqueo con 403 Forbidden a terceros no participantes.
+   - Archivo y desarchivo de conversación por participante independiente.
+   - Envío y listado cronológico de mensajes de texto (201 Created).
+   - Control RBAC: Miembro con rol `MEMBER` recibe 403 al intentar enviar mensajes.
+   - Rate limiting anti-spam (>30 msgs/min) con 429 Too Many Requests.
+   - Creación de propuesta formal inicial con estado `PENDING` y mensaje `SYSTEM`.
+   - Prohibición de auto-aceptación o auto-rechazo por el proponente (403 Forbidden).
+   - Bloqueo de respuesta a terceros (403 Forbidden).
+   - Flujo de contrapropuesta atómica: anterior pasa a `SUPERSEDED`, nueva queda `PENDING`.
+   - Rechazo formal de contrapropuesta por la contraparte (200 OK, `REJECTED`).
+   - Aceptación formal de propuesta por la contraparte (200 OK, `ACCEPTED`).
+   - Control de concurrencia ante doble respuesta (409 Conflict).
+   - Cierre de negociación: bloqueo de nuevas propuestas tras aceptación (409 Conflict).
 
 ---
 
@@ -485,6 +527,11 @@ Describe cada archivo del repositorio paso a paso, su propósito, responsabilida
   - Normaliza errores de red y respuestas del servidor en mensajes comprensibles.
 - **`src/api/auth.api.ts`**: Métodos para `register()`, `login()`, `logout()` y `getDataPolicyInfo()`.
 - **`src/api/users.api.ts`**: Métodos para `getMe()`, `updateMe()`, `deleteMe()`, `listAll()`, `adminCreate()`, `adminUpdate()` y `adminDelete()`.
+- **`src/api/organizations.api.ts`**: Métodos para organizaciones, membresías y verificación distrital.
+- **`src/api/catalog.api.ts`**: Consulta jerárquica de categorías y unidades de medida.
+- **`src/api/publications.api.ts`**: Métodos para crear, editar, buscar, cerrar y listar publicaciones.
+- **`src/api/matches.api.ts`**: Consulta de coincidencias por publicación y sugerencias personalizadas.
+- **`src/api/conversations.api.ts`** (Fase 10): Métodos para iniciar conversación, consultar bandeja, detalle, conteo de no leídos, archivo, envío de mensajes y ciclo de propuestas (crear, aceptar, rechazar).
 - **`src/context/AuthContext.tsx`**: Proveedor global de autenticación con React Context:
   - Restaura la sesión en frío validando el token contra `GET /users/me`.
   - Expone `login()`, `register()`, `logout()`, `updateProfile()`, `deleteAccount()`.

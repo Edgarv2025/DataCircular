@@ -20,14 +20,18 @@ import { ErrorBanner } from '../../../src/components/ErrorBanner';
 import { getCategoryIcon } from '../../../src/components/CategoryChip';
 import { PublicationsApi } from '../../../src/api/publications.api';
 import { MatchesApi } from '../../../src/api/matches.api';
+import { ConversationsApi } from '../../../src/api/conversations.api';
+import { useAuth } from '../../../src/context/AuthContext';
 
 export default function PublicationDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { user: currentUser } = useAuth();
 
   const [publication, setPublication] = useState<MaterialPublicationDto | null>(null);
   const [matches, setMatches] = useState<PublicationMatchDto[]>([]);
   const [loading, setLoading] = useState(true);
+  const [contacting, setContacting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -87,6 +91,26 @@ export default function PublicationDetailScreen() {
   const locality = publication.locationArea || 'Bogotá D.C.';
   const publisherName = publication.ownerUser?.fullName || 'Usuario de la Red';
   const orgName = publication.organization?.name;
+  const isOwnPublication = currentUser?.id === publication.ownerUserId;
+
+  const handleContact = async () => {
+    if (!publication) return;
+    setContacting(true);
+    setErrorMessage(null);
+    try {
+      const conv = await ConversationsApi.start({
+        publicationId: publication.id,
+      });
+      router.push({
+        pathname: '/(app)/chat',
+        params: { conversationId: conv.id },
+      } as any);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Error al iniciar la conversación');
+    } finally {
+      setContacting(false);
+    }
+  };
 
   return (
     <View style={styles.screen}>
@@ -182,13 +206,24 @@ export default function PublicationDetailScreen() {
           </View>
 
           {/* Botón de Contacto / Negociación */}
-          <TouchableOpacity
-            style={styles.contactButton}
-            onPress={() => router.push('/(app)/chat')}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.contactButtonText}>💬 Iniciar Conversación o Propuesta</Text>
-          </TouchableOpacity>
+          {isOwnPublication ? (
+            <View style={styles.ownPubBanner}>
+              <Text style={styles.ownPubText}>📌 Esta publicación fue creada por ti</Text>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={[styles.contactButton, contacting && { opacity: 0.7 }]}
+              onPress={handleContact}
+              disabled={contacting}
+              activeOpacity={0.85}
+            >
+              {contacting ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={styles.contactButtonText}>💬 Iniciar Conversación o Propuesta</Text>
+              )}
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Sección de Coincidencias Inteligentes (Fase 9 / HU-08) */}
@@ -406,6 +441,21 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '800',
+  },
+  ownPubBanner: {
+    backgroundColor: '#EAF1ED',
+    borderRadius: Tokens.radii.pill,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: '#C8DDD0',
+  },
+  ownPubText: {
+    color: Tokens.colors.primaryDark,
+    fontSize: 14,
+    fontWeight: '700',
   },
   matchesSection: {
     marginTop: 20,

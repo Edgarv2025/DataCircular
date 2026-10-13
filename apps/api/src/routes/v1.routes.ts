@@ -6,6 +6,7 @@ import { organizationsRouter } from '../modules/organizations/organizations.rout
 import { catalogRouter } from '../modules/catalog/catalog.routes';
 import { publicationsRouter } from '../modules/publications/publications.routes';
 import { matchesRouter } from '../modules/matches/matches.routes';
+import { conversationsRouter, proposalsRouter } from '../modules/conversations/conversations.routes';
 
 const v1Router = Router();
 
@@ -30,4 +31,11 @@ v1Router.use('/publications', publicationsRouter);
 // Módulo de Coincidencias y Sugerencias (Fase 9)
 v1Router.use('/matches', matchesRouter);
 
+// Módulo de Conversaciones y Mensajes (Fase 10)
+v1Router.use('/conversations', conversationsRouter);
+
+// Módulo de Propuestas y Negociaciones (Fase 10)
+v1Router.use('/proposals', proposalsRouter);
+
 export { v1Router };
+

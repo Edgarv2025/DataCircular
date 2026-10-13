@@ -219,6 +219,7 @@ Modela ofertas (`OFFER`) y necesidades (`NEED`) de materiales aprovechables gene
 | `20261002120000_add_data_policy_acceptance` | 2026-10-02 | Agrega tabla `data_policy_acceptances` para Habeas Data (Ley 1581 de 2012). |
 | `20261004140000_add_organizations_and_memberships` | 2026-10-04 | Agrega tablas `organizations`, `roles`, `permissions`, `role_permissions` y `organization_members`. |
 | `20261005140000_add_material_catalog_and_publications` | 2026-10-05 | Agrega tablas `material_categories`, `units` y `material_publications` con enums `PublicationType` y `PublicationStatus`. |
+| `20261013173917_add_conversations_and_proposals` | 2026-10-13 | Agrega tablas `conversations`, `conversation_participant_states`, `messages` y `proposals` con enums `ConversationStatus`, `MessageType` y `ProposalStatus`. |
 
 ---
 
@@ -235,5 +236,84 @@ Conforme a la sección 7.3 del documento de Requerimientos oficial:
   - Requerimiento prioritario o urgente: **+10 puntos**.
   - Publicación reciente ($\le 7$ días): **+5 puntos**.
   - **Umbral de corte**: $\ge 40$ puntos. Candidatos con menor puntaje se descartan para prevenir ruido. Cada coincidencia incluye sus factores en lenguaje claro.
+
+---
+
+## 9. Modelo de Conversaciones, Mensajes y Propuestas (Fase 10, RF-12, RF-13, CU-07)
+
+### Enums
+- `ConversationStatus`: `OPEN`, `ARCHIVED`, `BLOCKED`.
+- `MessageType`: `TEXT`, `SYSTEM`.
+- `ProposalStatus`: `PENDING`, `ACCEPTED`, `REJECTED`, `SUPERSEDED`.
+
+### Tabla `conversations`
+Almacena el hilo de negociación entre dos partes vinculado a una publicación específica.
+
+| Campo | Tipo | Nulo | Default | Descripción |
+| :--- | :--- | :--- | :--- | :--- |
+| `id` | `UUID` | NOT NULL | `gen_random_uuid()` | Llave primaria |
+| `publication_id` | `UUID` | NOT NULL | - | FK a `material_publications.id` (ON DELETE RESTRICT) |
+| `initiator_user_id` | `UUID` | NOT NULL | - | FK a `users.id` (ON DELETE CASCADE) |
+| `initiator_organization_id` | `UUID` | NULL | NULL | FK a `organizations.id` (ON DELETE SET NULL) |
+| `counterpart_user_id` | `UUID` | NOT NULL | - | FK a `users.id` (dueño de publicación) |
+| `counterpart_organization_id` | `UUID` | NULL | NULL | FK a `organizations.id` (org de la publicación) |
+| `status` | `ConversationStatus` | NOT NULL | `'OPEN'` | Estado de la conversación |
+| `last_message_at` | `TIMESTAMPTZ(6)` | NULL | NULL | Marca temporal para ordenamiento rápido de bandeja |
+| `created_at` | `TIMESTAMPTZ(6)` | NOT NULL | CURRENT_TIMESTAMP | Fecha de creación |
+| `updated_at` | `TIMESTAMPTZ(6)` | NOT NULL | Auto | Fecha de actualización |
+
+- **Restricción de Unicidad**: `UNIQUE(publication_id, initiator_user_id)` para garantizar idempotencia en apertura de chat.
+- **Índices**: `publication_id`, `initiator_user_id`, `counterpart_user_id`, `last_message_at`, `status`.
+
+### Tabla `conversation_participant_states`
+Rastrea la lectura y archivado independiente por cada participante.
+
+| Campo | Tipo | Nulo | Default | Descripción |
+| :--- | :--- | :--- | :--- | :--- |
+| `conversation_id` | `UUID` | NOT NULL | - | FK a `conversations.id` (ON DELETE CASCADE) |
+| `user_id` | `UUID` | NOT NULL | - | FK a `users.id` (ON DELETE CASCADE) |
+| `last_read_at` | `TIMESTAMPTZ(6)` | NULL | NULL | Marca temporal del último mensaje leído |
+| `archived_at` | `TIMESTAMPTZ(6)` | NULL | NULL | Marca temporal de archivado independiente |
+
+- **Llave Primaria Compuesta**: `PRIMARY KEY (conversation_id, user_id)`.
+
+### Tabla `messages`
+Mensajes inmutables (texto o sistema) intercambiados en la conversación.
+
+| Campo | Tipo | Nulo | Default | Descripción |
+| :--- | :--- | :--- | :--- | :--- |
+| `id` | `UUID` | NOT NULL | `gen_random_uuid()` | Llave primaria |
+| `conversation_id` | `UUID` | NOT NULL | - | FK a `conversations.id` (ON DELETE CASCADE) |
+| `sender_user_id` | `UUID` | NULL | NULL | FK a `users.id` (NULL en mensajes SYSTEM) |
+| `body` | `TEXT` | NOT NULL | - | Contenido del mensaje (1 a 2000 caracteres) |
+| `type` | `MessageType` | NOT NULL | `'TEXT'` | Tipo de mensaje (`TEXT` o `SYSTEM`) |
+| `metadata` | `JSONB` | NULL | NULL | Datos estructurados del evento de sistema |
+| `created_at` | `TIMESTAMPTZ(6)` | NOT NULL | CURRENT_TIMESTAMP | Fecha de envío |
+
+- **Índices**: `(conversation_id, created_at)`.
+
+### Tabla `proposals`
+Propuestas formales y contrapropuestas en el proceso de negociación.
+
+| Campo | Tipo | Nulo | Default | Descripción |
+| :--- | :--- | :--- | :--- | :--- |
+| `id` | `UUID` | NOT NULL | `gen_random_uuid()` | Llave primaria |
+| `conversation_id` | `UUID` | NOT NULL | - | FK a `conversations.id` (ON DELETE CASCADE) |
+| `publication_id` | `UUID` | NOT NULL | - | FK a `material_publications.id` (ON DELETE RESTRICT) |
+| `proposer_user_id` | `UUID` | NOT NULL | - | FK a `users.id` (ON DELETE CASCADE) |
+| `proposer_organization_id` | `UUID` | NULL | NULL | FK a `organizations.id` (ON DELETE SET NULL) |
+| `quantity` | `DECIMAL(12,2)` | NOT NULL | - | Cantidad acordada |
+| `unit_id` | `UUID` | NOT NULL | - | FK a `units.id` (ON DELETE RESTRICT) |
+| `terms` | `TEXT` | NOT NULL | - | Condiciones acordadas (1 a 2000 caracteres) |
+| `status` | `ProposalStatus` | NOT NULL | `'PENDING'` | Estado (`PENDING`, `ACCEPTED`, `REJECTED`, `SUPERSEDED`) |
+| `parent_proposal_id` | `UUID` | NULL | NULL | Auto-FK a `proposals.id` (para contrapropuestas) |
+| `responded_by_user_id` | `UUID` | NULL | NULL | FK a `users.id` (quien aceptó o rechazó) |
+| `responded_at` | `TIMESTAMPTZ(6)` | NULL | NULL | Fecha de respuesta |
+| `created_at` | `TIMESTAMPTZ(6)` | NOT NULL | CURRENT_TIMESTAMP | Fecha de propuesta |
+| `updated_at` | `TIMESTAMPTZ(6)` | NOT NULL | Auto | Fecha de actualización |
+
+- **Regla de Consistencia Atómica**: En una conversación solo puede haber a lo sumo una propuesta `PENDING` simultánea. Al formular una contrapropuesta o nueva propuesta, la anterior pasa a `SUPERSEDED` dentro de la transacción atómica.
+- **Índices**: `conversation_id`, `publication_id`, `proposer_user_id`, `status`.
+
 
 

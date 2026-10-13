@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Tokens } from '../theme/tokens';
+import { ConversationsApi } from '../api/conversations.api';
 
 export type TabKey = 'home' | 'publish' | 'chat' | 'profile';
 
@@ -17,9 +18,38 @@ interface BottomTabBarProps {
  */
 export const BottomTabBar: React.FC<BottomTabBarProps> = ({
   activeTab,
-  unreadChatCount = 3,
+  unreadChatCount: propUnreadCount,
 }) => {
   const router = useRouter();
+  const [dynamicUnread, setDynamicUnread] = useState<number>(propUnreadCount ?? 0);
+
+  useEffect(() => {
+    if (propUnreadCount !== undefined) {
+      setDynamicUnread(propUnreadCount);
+      return;
+    }
+
+    let isMounted = true;
+    const fetchUnread = async () => {
+      try {
+        const res = await ConversationsApi.getUnreadCount();
+        if (isMounted && typeof res?.unreadCount === 'number') {
+          setDynamicUnread(res.unreadCount);
+        }
+      } catch {
+        // Ignorar si no hay sesión activa
+      }
+    };
+
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 15000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [propUnreadCount]);
+
+  const unreadChatCount = propUnreadCount !== undefined ? propUnreadCount : dynamicUnread;
 
   const handleNavigate = (tab: TabKey) => {
     switch (tab) {

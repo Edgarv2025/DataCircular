@@ -848,4 +848,159 @@ export interface MySuggestionsItemDto {
   matches: PublicationMatchDto[];
 }
 
+// ==========================================
+// FASE 10: CONVERSACIONES, MENSAJES Y PROPUESTAS
+// ==========================================
+
+export const CONVERSATION_STATUSES = ['OPEN', 'ARCHIVED', 'BLOCKED'] as const;
+export type ConversationStatus = (typeof CONVERSATION_STATUSES)[number];
+
+export const MESSAGE_TYPES = ['TEXT', 'SYSTEM'] as const;
+export type MessageType = (typeof MESSAGE_TYPES)[number];
+
+export const PROPOSAL_STATUSES = ['PENDING', 'ACCEPTED', 'REJECTED', 'SUPERSEDED'] as const;
+export type ProposalStatus = (typeof PROPOSAL_STATUSES)[number];
+
+export interface CounterpartSummaryDto {
+  userId: string;
+  displayName: string;
+  organizationId?: string | null;
+  organizationName?: string | null;
+  verificationStatus?: VerificationStatus;
+}
+
+export interface MessageDto {
+  id: string;
+  conversationId: string;
+  senderUserId: string | null;
+  senderDisplayName?: string;
+  senderIsOrganization?: boolean;
+  body: string;
+  type: MessageType;
+  metadata?: Record<string, unknown> | null;
+  createdAt: string;
+  isMine?: boolean;
+}
+
+export interface ProposalDto {
+  id: string;
+  conversationId: string;
+  publicationId: string;
+  proposerUserId: string;
+  proposerOrganizationId: string | null;
+  proposerDisplayName?: string;
+  quantity: number;
+  unitId: string;
+  unitName?: string;
+  unitAbbreviation?: string;
+  terms: string;
+  status: ProposalStatus;
+  parentProposalId: string | null;
+  respondedByUserId: string | null;
+  respondedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  isMine?: boolean;
+}
+
+export interface ConversationPublicationSummaryDto {
+  id: string;
+  type: PublicationType;
+  categoryId: string;
+  categoryName?: string;
+  quantity: number;
+  unitId: string;
+  unitName?: string;
+  unitAbbreviation?: string;
+  locationAddress: string;
+  locationCity?: string | null;
+  locationArea?: string | null;
+  photoUrl?: string | null;
+  status: PublicationStatus;
+}
+
+export interface ConversationDto {
+  id: string;
+  publicationId: string;
+  initiatorUserId: string;
+  initiatorOrganizationId: string | null;
+  counterpartUserId: string;
+  counterpartOrganizationId: string | null;
+  status: ConversationStatus;
+  lastMessageAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  unreadCount?: number;
+  isArchived?: boolean;
+  publication?: ConversationPublicationSummaryDto;
+  counterpart?: CounterpartSummaryDto;
+  lastMessage?: MessageDto | null;
+  currentProposal?: ProposalDto | null;
+}
+
+// Esquemas Zod para Fase 10
+export const startConversationSchema = z.object({
+  publicationId: z.string().uuid('El ID de publicación debe ser un UUID válido'),
+  organizationId: z.string().uuid('El ID de organización debe ser un UUID válido').optional().nullable(),
+  initialMessage: z
+    .string()
+    .trim()
+    .min(1, 'El mensaje inicial no puede estar vacío')
+    .max(2000, 'El mensaje no puede exceder 2000 caracteres')
+    .optional(),
+});
+export type StartConversationInput = z.infer<typeof startConversationSchema>;
+
+export const sendMessageSchema = z.object({
+  body: z
+    .string({ required_error: 'El cuerpo del mensaje es requerido' })
+    .trim()
+    .min(1, 'El mensaje no puede estar vacío')
+    .max(2000, 'El mensaje no puede exceder 2000 caracteres'),
+});
+export type SendMessageInput = z.infer<typeof sendMessageSchema>;
+
+export const createProposalSchema = z.object({
+  quantity: z
+    .number({ required_error: 'La cantidad es requerida' })
+    .positive('La cantidad debe ser mayor a cero'),
+  unitId: z
+    .string({ required_error: 'La unidad es requerida' })
+    .uuid('El ID de unidad debe ser un UUID válido'),
+  terms: z
+    .string({ required_error: 'Los términos y condiciones son requeridos' })
+    .trim()
+    .min(1, 'Los términos no pueden estar vacíos')
+    .max(2000, 'Los términos no pueden exceder 2000 caracteres'),
+  parentProposalId: z
+    .string()
+    .uuid('El ID de propuesta previa debe ser un UUID válido')
+    .optional()
+    .nullable(),
+  organizationId: z
+    .string()
+    .uuid('El ID de organización debe ser un UUID válido')
+    .optional()
+    .nullable(),
+});
+export type CreateProposalInput = z.infer<typeof createProposalSchema>;
+
+export const getConversationsQuerySchema = z.object({
+  status: z.enum(CONVERSATION_STATUSES).optional(),
+  archived: z
+    .union([z.boolean(), z.enum(['true', 'false'])])
+    .transform((v) => (typeof v === 'boolean' ? v : v === 'true'))
+    .optional(),
+  page: z.coerce.number().int().min(1).default(1).optional(),
+  pageSize: z.coerce.number().int().min(1).max(50).default(20).optional(),
+});
+export type GetConversationsQuery = z.infer<typeof getConversationsQuerySchema>;
+
+export const getMessagesQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1).optional(),
+  pageSize: z.coerce.number().int().min(1).max(100).default(50).optional(),
+});
+export type GetMessagesQuery = z.infer<typeof getMessagesQuerySchema>;
+
+
 
