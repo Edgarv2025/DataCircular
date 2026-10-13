@@ -5,13 +5,16 @@ import { z } from 'zod';
 // Cargar variables de entorno desde .env si existe
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
+const defaultJwtSecret = 'default_dev_secret_change_me_12345';
+const defaultJwtRefreshSecret = 'default_dev_refresh_secret_12345';
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().default(3000),
   DATABASE_URL: z.string().min(1, 'DATABASE_URL es requerida'),
-  JWT_SECRET: z.string().min(16, 'JWT_SECRET debe tener al menos 16 caracteres').default('default_dev_secret_change_me_12345'),
+  JWT_SECRET: z.string().min(16, 'JWT_SECRET debe tener al menos 16 caracteres').default(defaultJwtSecret),
   JWT_EXPIRES_IN: z.string().default('7d'),
-  JWT_REFRESH_SECRET: z.string().min(16).default('default_dev_refresh_secret_12345'),
+  JWT_REFRESH_SECRET: z.string().min(16).default(defaultJwtRefreshSecret),
   JWT_REFRESH_EXPIRES_IN: z.string().default('30d'),
   CORS_ORIGIN: z.string().default('*'),
   DATA_POLICY_URL: z.preprocess(
@@ -22,6 +25,24 @@ const envSchema = z.object({
     (value) => value === '1.0-draft' ? undefined : value,
     z.string().min(1).default('pendiente')
   ),
+}).superRefine((config, context) => {
+  if (config.NODE_ENV !== 'production') return;
+
+  if (config.JWT_SECRET === defaultJwtSecret) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['JWT_SECRET'],
+      message: 'JWT_SECRET debe configurarse con un secreto propio en producción',
+    });
+  }
+
+  if (config.JWT_REFRESH_SECRET === defaultJwtRefreshSecret) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['JWT_REFRESH_SECRET'],
+      message: 'JWT_REFRESH_SECRET debe configurarse con un secreto propio en producción',
+    });
+  }
 });
 
 const parsed = envSchema.safeParse(process.env);
