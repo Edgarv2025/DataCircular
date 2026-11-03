@@ -24,29 +24,44 @@ export class PublicationError extends Error {
 
 export class PublicationsService {
   /**
-   * Valida permisos para modificar o cerrar una publicación:
-   * - El usuario creador (ownerUserId) tiene permiso directo.
-   * - Si la publicación está asociada a una organización, un miembro con rol OWNER, ADMIN
-   *   o permiso 'org:update' tiene autorización.
-   * - Los administradores globales de la plataforma (UserRole === 'ADMIN') tienen bypass total.
+   * El dueño administra su publicación; cualquier parte de una coincidencia puede
+   * cambiar únicamente la solicitud de transporte.
    */
   private async assertCanModify(
     pub: MaterialPublicationDto,
-    user: SafeUserDto
+    user: SafeUserDto,
+    input?: UpdatePublicationInput
   ): Promise<void> {
-    if (user.role === 'ADMIN') return;
+    if (user.role !== 'USER') {
+      throw new PublicationError(
+        'FORBIDDEN',
+        'Los administradores no pueden actuar como participantes de publicaciones',
+        403
+      );
+    }
 
-    if (pub.ownerUserId === user.id) return;
-
-    if (pub.organizationId) {
-      const membership = await organizationsRepository.findMember(pub.organizationId, user.id);
-      if (membership && membership.status === 'ACTIVE') {
-        const roleName = membership.role.name;
-        const permissions = membership.role.permissions.map((rp) => rp.permission.code);
-        if (roleName === 'OWNER' || roleName === 'ADMIN' || permissions.includes('org:update')) {
-          return;
-        }
+    if (input && Object.prototype.hasOwnProperty.call(input, 'requiresTransport')) {
+      const isTransportToggleOnly =
+        Object.keys(input).length === 1 &&
+        Object.prototype.hasOwnProperty.call(input, 'requiresTransport');
+      if (!isTransportToggleOnly) {
+        throw new PublicationError(
+          'FORBIDDEN',
+          'La solicitud de transporte debe actualizarse por separado',
+          403
+        );
       }
+
+      if (await matchesService.isMatchParticipantForPublication(pub.id, user.id)) return;
+      throw new PublicationError(
+        'TRANSPORT_REQUIRES_MATCH',
+        'Solo las partes de una publicación con coincidencias pueden solicitar transporte',
+        403
+      );
+    }
+
+    if (pub.ownerUserId === user.id) {
+      return;
     }
 
     throw new PublicationError(
@@ -60,6 +75,28 @@ export class PublicationsService {
     input: CreatePublicationInput,
     user: SafeUserDto
   ): Promise<MaterialPublicationDto> {
+    if (user.role !== 'USER') {
+      throw new PublicationError(
+        'FORBIDDEN',
+        'Los administradores no pueden crear publicaciones',
+        403
+      );
+    }
+    if (user.userType !== 'GENERATOR' || input.type !== 'OFFER') {
+      throw new PublicationError(
+        'FORBIDDEN',
+        'Solo los generadores pueden publicar ofertas de material; las demandas no están habilitadas',
+        403
+      );
+    }
+    if (input.requiresTransport) {
+      throw new PublicationError(
+        'TRANSPORT_REQUIRES_MATCH',
+        'El transporte solo se puede solicitar después de encontrar una coincidencia',
+        400
+      );
+    }
+
     // 1. Validar que la categoría exista y sea una subcategoría (parentId no nulo)
     const category = await catalogRepository.findCategoryById(input.categoryId);
     if (!category) {
@@ -91,30 +128,42 @@ export class PublicationsService {
         );
       }
 
-      if (user.role !== 'ADMIN') {
-        const membership = await organizationsRepository.findMember(input.organizationId, user.id);
-        if (!membership || membership.status !== 'ACTIVE') {
-          throw new PublicationError(
-            'FORBIDDEN',
-            'No perteneces a la organización bajo la cual intentas publicar',
-            403
-          );
-        }
+      const membership = await organizationsRepository.findMember(input.organizationId, user.id);
+      if (!membership || membership.status !== 'ACTIVE') {
+        throw new PublicationError(
+          'FORBIDDEN',
+          'No perteneces a la organización bajo la cual intentas publicar',
+          403
+        );
       }
     }
 
     return publicationsRepository.create(input, user.id);
   }
 
-  async getPublicationById(id: string): Promise<MaterialPublicationDto> {
+  async getPublicationById(id: string, user: SafeUserDto): Promise<MaterialPublicationDto> {
     const pub = await publicationsRepository.findById(id);
     if (!pub) {
       throw new PublicationError('PUBLICATION_NOT_FOUND', 'Publicación no encontrada', 404);
     }
+    if (user.role !== 'USER') {
+      throw new PublicationError('FORBIDDEN', 'Los administradores solo pueden acceder a funciones administrativas', 403);
+    }
+
+    const isOwner = pub.ownerUserId === user.id;
+    const isPublicAndActive = pub.status === 'ACTIVE' && !pub.deletedAt &&
+      (!pub.expiresAt || new Date(pub.expiresAt) > new Date());
+    const canBrowse = user.userType !== 'GENERATOR';
+
+    if (!isOwner && !(isPublicAndActive && canBrowse)) {
+      throw new PublicationError('FORBIDDEN', 'No tienes acceso a esta publicación', 403);
+    }
     const compatibleCount = await matchesService.countMatchesForPublication(pub.id);
+    const isMatchParticipant = await matchesService.isMatchParticipantForPublication(pub.id, user.id);
     return {
       ...pub,
       publicacionesCompatibles: compatibleCount,
+      isMatchParticipant,
     };
   }
 
@@ -128,7 +177,7 @@ export class PublicationsService {
       throw new PublicationError('PUBLICATION_NOT_FOUND', 'Publicación no encontrada', 404);
     }
 
-    await this.assertCanModify(pub, user);
+    await this.assertCanModify(pub, user, input);
 
     if (input.unitId) {
       const unit = await catalogRepository.findUnitById(input.unitId);
@@ -187,6 +236,22 @@ export class PublicationsService {
     query: SearchPublicationsQuery,
     user: SafeUserDto
   ): Promise<PublicationSearchResultDto> {
+    if (user.role !== 'USER') {
+      throw new PublicationError(
+        'FORBIDDEN',
+        'Los administradores no pueden consultar publicaciones como participantes',
+        403
+      );
+    }
+    if (query.type === 'NEED') {
+      return {
+        data: [],
+        total: 0,
+        page: query.page || 1,
+        pageSize: query.pageSize || 20,
+        totalPages: 0,
+      };
+    }
     return publicationsRepository.search(query, user);
   }
 }

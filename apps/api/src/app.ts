@@ -5,10 +5,14 @@ import { v1Router } from './routes/v1.routes';
 import { dashboardRouter } from './modules/dashboard/dashboard.routes';
 import { errorHandler } from './middleware/errorHandler';
 import { notFoundHandler } from './middleware/notFoundHandler';
+import { telemetryMiddleware } from './middleware/telemetry.middleware';
 import { env } from './config/env';
 
 export function createApp(): Application {
   const app: Application = express();
+
+  // Telemetría de Conexiones y Sesiones de Usuario
+  app.use(telemetryMiddleware);
 
   // Middleware de Seguridad HTTP Headers
   app.use(

@@ -37,11 +37,30 @@ export const Tokens = {
     urgentBg: '#D90429',
     info: '#2563EB',
 
+    // Bloque A3 - Identidad de Marca y Reglas de Contraste Accesible (WCAG AA)
+    // - brand.orange = #FA6060 (color oficial confirmado de la marca).
+    // - Regla de contraste: #FFFFFF sobre #FA6060 = 3,04:1 (no cumple AA < 4,5:1),
+    //   por lo que sobre este color se usa texto verde oscuro #102A1C = 5,04:1 (cumple AA).
+    // - Regla de contraste: #C2570C sobre #FFFFFF = 4,50:1 (cumple AA en el límite).
+    // - Para texto pequeño sobre fondo blanco se provee orangeDark #B84F08 = 5,02:1 (cumple AA holgadamente).
+    brand: {
+      orange: '#FA6060',            // Color oficial de la marca
+      orangeStrong: '#C2570C',      // Naranja accesible sobre blanco (4,50:1 en el límite AA)
+      orangeDark: '#B84F08',        // Naranja reforzado para texto pequeño sobre blanco (5,02:1 cumple AA)
+      textOnOrange: '#102A1C',      // Texto verde oscuro accesible sobre brand.orange (5,04:1 cumple AA)
+      orangeTint: '#FFF0E8',        // Fondo informativo naranja claro
+    },
+
     // Alias compatibles para componentes
     primary: '#1F7A45',
     primaryDark: '#1F4D36',
     accentLight: '#E4EEE4',
     loginInputBg: '#244D38',
+    brandOrange: '#FA6060',
+    brandOrangeStrong: '#C2570C',
+    brandOrangeDark: '#B84F08',
+    brandTextOnOrange: '#102A1C',
+    brandOrangeTint: '#FFF0E8',
   },
   radii: {
     xs: 4,

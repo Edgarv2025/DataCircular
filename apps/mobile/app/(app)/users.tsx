@@ -28,6 +28,7 @@ import { ErrorBanner } from '../../src/components/ErrorBanner';
 import { Input } from '../../src/components/Input';
 
 import { BrandHeader } from '../../src/components/BrandHeader';
+import { navigateBackOrFallback } from '../../src/navigation';
 
 const USER_TYPES: { value: UserType; label: string }[] = [
   { value: 'GENERATOR', label: 'Generador' },
@@ -58,12 +59,19 @@ const EMPTY_FORM: UserForm = {
 
 export default function UsersScreen() {
   const router = useRouter();
+  const handleBack = () =>
+    navigateBackOrFallback(
+      () => router.canGoBack(),
+      () => router.back(),
+      () => router.replace('/(app)/admin')
+    );
   const { user, isLoading: authLoading } = useAuth();
   const [users, setUsers] = useState<SafeUserDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
+  const [userTypeFilter, setUserTypeFilter] = useState<'ALL' | 'ADMIN' | UserType>('ALL');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingUser, setEditingUser] = useState<SafeUserDto | null>(null);
@@ -205,9 +213,17 @@ export default function UsersScreen() {
     setForm((current) => ({ ...current, [key]: value }));
   };
 
-  const visibleUsers = users.filter((item) =>
-    `${item.fullName} ${item.email}`.toLowerCase().includes(search.trim().toLowerCase())
-  );
+  const visibleUsers = users.filter((item) => {
+    const matchesSearch = `${item.fullName} ${item.email}`
+      .toLowerCase()
+      .includes(search.trim().toLowerCase());
+    const matchesType =
+      userTypeFilter === 'ALL' ||
+      (userTypeFilter === 'ADMIN'
+        ? item.role === 'ADMIN'
+        : item.role !== 'ADMIN' && item.userType === userTypeFilter);
+    return matchesSearch && matchesType;
+  });
 
   if (authLoading || user?.role !== 'ADMIN') return null;
 
@@ -217,7 +233,7 @@ export default function UsersScreen() {
         title="Administración de Usuarios"
         subtitle="DATA_CIRCULAR • Control de Cuentas"
         showBack={true}
-        onBack={() => router.back()}
+        onBack={handleBack}
         curved={true}
       />
       <ScrollView
@@ -239,6 +255,27 @@ export default function UsersScreen() {
           onChangeText={setSearch}
           placeholder="Nombre o correo electrónico"
         />
+        <Text style={styles.filterLabel}>Filtrar por tipo de usuario</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.typeFilters}>
+          <UserTypeFilter
+            label="Todos"
+            selected={userTypeFilter === 'ALL'}
+            onPress={() => setUserTypeFilter('ALL')}
+          />
+          <UserTypeFilter
+            label="Administradores"
+            selected={userTypeFilter === 'ADMIN'}
+            onPress={() => setUserTypeFilter('ADMIN')}
+          />
+          {USER_TYPES.map((type) => (
+            <UserTypeFilter
+              key={type.value}
+              label={type.label}
+              selected={userTypeFilter === type.value}
+              onPress={() => setUserTypeFilter(type.value)}
+            />
+          ))}
+        </ScrollView>
 
         {loading ? <Text style={styles.message}>Cargando usuarios...</Text> : null}
         {!loading && visibleUsers.length === 0 ? (
@@ -251,8 +288,9 @@ export default function UsersScreen() {
               <Text style={styles.userName}>{item.fullName}</Text>
               <Text style={styles.userEmail}>{item.email}</Text>
               <Text style={styles.userMeta}>
-                {USER_TYPES.find((type) => type.value === item.userType)?.label || item.userType}
-                {' · '}{item.role === 'ADMIN' ? 'Administrador' : 'Usuario'}
+                {item.role === 'ADMIN'
+                  ? 'Administrador'
+                  : USER_TYPES.find((type) => type.value === item.userType)?.label || item.userType}
                 {' · '}{item.deletedAt ? 'Desactivado' : item.status === 'ACTIVE' ? 'Activo' : item.status}
               </Text>
             </View>
@@ -328,17 +366,23 @@ export default function UsersScreen() {
                 keyboardType="phone-pad"
               />
 
-              <Text style={styles.fieldLabel}>Tipo de usuario</Text>
-              <View style={styles.optionsRow}>
-                {USER_TYPES.map((type) => (
-                  <ChoiceButton
-                    key={type.value}
-                    label={type.label}
-                    selected={form.userType === type.value}
-                    onPress={() => setFormValue('userType', type.value)}
-                  />
-                ))}
-              </View>
+              {form.role === 'ADMIN' ? (
+                <Text style={styles.fieldLabel}>Perfil operativo: No aplica a administradores.</Text>
+              ) : (
+                <>
+                  <Text style={styles.fieldLabel}>Tipo de usuario</Text>
+                  <View style={styles.optionsRow}>
+                    {USER_TYPES.map((type) => (
+                      <ChoiceButton
+                        key={type.value}
+                        label={type.label}
+                        selected={form.userType === type.value}
+                        onPress={() => setFormValue('userType', type.value)}
+                      />
+                    ))}
+                  </View>
+                </>
+              )}
 
               <Text style={styles.fieldLabel}>Rol de acceso</Text>
               <View style={styles.optionsRow}>
@@ -387,6 +431,27 @@ function ChoiceButton({ label, selected, onPress }: { label: string; selected: b
   );
 }
 
+function UserTypeFilter({
+  label,
+  selected,
+  onPress,
+}: {
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      accessibilityRole="radio"
+      accessibilityState={{ checked: selected }}
+      onPress={onPress}
+      style={[styles.typeFilter, selected && styles.typeFilterSelected]}
+    >
+      <Text style={[styles.typeFilterText, selected && styles.typeFilterTextSelected]}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.background },
   content: { padding: 16, paddingBottom: 32 },
@@ -395,6 +460,12 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 13, color: Colors.textMuted, marginTop: 2 },
   createButton: { minWidth: 132, marginVertical: 0 },
   message: { color: Colors.textMuted, textAlign: 'center', paddingVertical: 24 },
+  filterLabel: { fontSize: 12, fontWeight: '700', color: Colors.text, marginTop: 6 },
+  typeFilters: { flexGrow: 0, marginVertical: 8 },
+  typeFilter: { borderWidth: 1, borderColor: Colors.border, borderRadius: 18, paddingHorizontal: 12, paddingVertical: 7, marginRight: 8, backgroundColor: Colors.card },
+  typeFilterSelected: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  typeFilterText: { fontSize: 12, color: Colors.textMuted, fontWeight: '600' },
+  typeFilterTextSelected: { color: '#FFFFFF' },
   userCard: { marginBottom: 10, padding: 14 },
   userInfo: { minWidth: 0 },
   userName: { fontSize: 15, fontWeight: '700', color: Colors.text },

@@ -1,0 +1,238 @@
+================================================================================
+DATA_CIRCULAR - CATÁLOGO DE RUTAS DE VISTAS Y PANTALLAS (EXPO ROUTER v4)
+Plataforma de Economía Circular y Trazabilidad de Residuos - Bogotá D.C.
+================================================================================
+
+1. ARQUITECTURA DE ENRUTAMIENTO
+--------------------------------------------------------------------------------
+- Framework: Expo Router v4 (File-based Routing en React Native).
+- Ubicación de Vistas: apps/mobile/app/
+- Manejador de Sesión: AuthContext (apps/mobile/src/context/AuthContext.tsx)
+- Layout Raíz: apps/mobile/app/_layout.tsx (Stack principal con SafeAreaProvider y AuthProvider)
+- Layout Autenticación: apps/mobile/app/(auth)/_layout.tsx (Stack sin cabeceras duplicadas)
+- Layout Aplicación: apps/mobile/app/(app)/_layout.tsx (Stack autenticado con guardia de roles)
+
+Reglas de Control de Acceso y Redirección en apps/mobile/app/(app)/_layout.tsx:
+  * Sin sesión activa: Redirige automáticamente a '/(auth)/login'.
+  * Rol 'ADMIN': Redirige automáticamente a '/(app)/admin' y restringe el acceso
+    únicamente a '/admin', '/users', '/profile' y '/edit-profile'.
+  * Rol 'USER' con tipo 'GENERATOR': Al entrar a la raíz autenticada '/(app)',
+    redirige preferentemente a '/(app)/publish'.
+  * Otros participantes ('RECYCLER', 'TRANSPORTER', 'TRANSFORMER'):
+    Acceso completo al mercado circular en '/(app)'.
+
+
+================================================================================
+2. VISTAS PÚBLICAS Y BIENVENIDA
+================================================================================
+
+Ruta: /
+Archivo: apps/mobile/app/index.tsx
+Nombre: WelcomeScreen (Bienvenida y Onboarding Territorial)
+Acceso: Público / Abierto
+Descripción:
+  - Presentación institucional distrital (Bogotá D.C. • Fundación IMARA).
+  - Trazabilidad y articulación de las 20 localidades distritales.
+  - Enlaces directos a inicio de sesión y registro de participantes.
+  - Redirección automática a '/(app)/profile' si el usuario ya cuenta con sesión.
+
+
+================================================================================
+3. VISTAS DEL MÓDULO DE AUTENTICACIÓN (GRUPO: /(auth))
+================================================================================
+
+Ruta: /(auth)/login
+Archivo: apps/mobile/app/(auth)/login.tsx
+Nombre: LoginScreen (Inicio de Sesión)
+Acceso: Público (usuarios sin autenticar)
+Descripción:
+  - Formulario de acceso con correo electrónico y contraseña.
+  - Validación de campos con feedback visual instantáneo.
+  - Soporte de roles (ADMIN y USER).
+  - Enlaces hacia el formulario de registro y recuperación de clave.
+
+Ruta: /(auth)/register
+Archivo: apps/mobile/app/(auth)/register.tsx
+Nombre: RegisterScreen (Registro de Actores Distritales)
+Acceso: Público
+Descripción:
+  - Registro de participantes clasificados por actor:
+      * GENERATOR (Generador de residuos/materiales)
+      * RECYCLER (Reciclador / Recuperador de oficio)
+      * TRANSPORTER (Transportador logístico)
+      * TRANSFORMER (Industria transformadora)
+  - Selector de las 20 localidades oficiales de Bogotá D.C.
+  - Consentimiento expreso de tratamiento de datos personales (Ley 1581 de 2012).
+
+Ruta: /(auth)/forgot-password
+Archivo: apps/mobile/app/(auth)/forgot-password.tsx
+Nombre: ForgotPasswordScreen (Recuperación de Contraseña)
+Acceso: Público
+Descripción:
+  - Formulario institucional para solicitud de restablecimiento de contraseña.
+
+
+================================================================================
+4. VISTAS PRINCIPALES DE LA APLICACIÓN (GRUPO: /(app))
+================================================================================
+
+--------------------------------------------------------------------------------
+A. VISTAS PARA USUARIOS GENERALES Y PARTICIPANTES CIRCULARES (Rol USER)
+--------------------------------------------------------------------------------
+
+Ruta: /(app)  o  /(app)/index
+Archivo: apps/mobile/app/(app)/index.tsx
+Nombre: HomeScreen (Marketplace / Explorador de Materiales)
+Acceso: Rol USER (Recuperadores, Transportadores, Transformadores)
+Descripción:
+  - Buscador dinámico de materiales en tiempo real.
+  - Carrusel horizontal con categorías del catálogo distrital.
+  - Conmutador entre Ofertas y Necesidades.
+  - Sección de recomendaciones de coincidencias (matches inteligentes).
+  - Cuadrícula de 2 columnas de tarjetas de material con insignia de localidad.
+  - Modal deslizante de filtros avanzados (cantidad, unidad, urgencia, localidad).
+
+Ruta: /(app)/publish
+Archivo: apps/mobile/app/(app)/publish.tsx
+Nombre: PublishScreen (Publicar Materiales y Mis Publicaciones)
+Acceso: Rol USER (Habilitado para Generadores y actores circulares)
+Descripción:
+  - Pestaña "Nueva Publicación": Formulario estructurado para registrar ofertas
+    o demandas de residuos con catálogo jerárquico, cantidades, fotos y localidad.
+  - Pestaña "Mis Publicaciones": Listado de publicaciones creadas por el usuario,
+    con estado (activa/completada), acceso a edición y opción de eliminación.
+
+Ruta: /(app)/publication/[id]
+Archivo: apps/mobile/app/(app)/publication/[id].tsx
+Nombre: PublicationDetailScreen (Detalle de Publicación)
+Acceso: Rol USER
+Parámetro: id (UUID de la publicación de material)
+Descripción:
+  - Ficha técnica completa del material (tipo, estado, cantidad, unidad, urgencia).
+  - Información y estado de verificación del actor que publica.
+  - Ubicación y localidad de Bogotá D.C.
+  - Desglose auditable de compatibilidad (motor de matches: distancia, categoría, volumen).
+  - Botón de contacto directo para iniciar conversación comercial.
+
+Ruta: /(app)/edit-publication/[id]
+Archivo: apps/mobile/app/(app)/edit-publication/[id].tsx
+Nombre: EditPublicationScreen (Editar Publicación de Material)
+Acceso: Rol USER (Exclusivo para el propietario de la publicación)
+Parámetro: id (UUID de la publicación a editar)
+Descripción:
+  - Formulario de actualización de cantidad disponible, unidad, descripción,
+    dirección, localidad distrital, URL de foto y bandera de urgencia.
+
+Ruta: /(app)/chat
+Archivo: apps/mobile/app/(app)/chat.tsx
+Nombre: ChatScreen (Centro de Negociación, Mensajería y Trazabilidad)
+Acceso: Rol USER
+Descripción:
+  - Bandeja y canal de mensajería instantánea bidireccional entre actores.
+  - Módulo de Propuestas Comerciales Circulares (creación, cotización, aceptación).
+  - Módulo de Operaciones de Trazabilidad Logística:
+      * Programación de fecha y ventana horaria de recolección.
+      * Confirmación de recolección y subida de evidencia fotográfica.
+      * Confirmación de recepción y pesaje en planta de transformación.
+      * Cierre de ciclo y emisión de calificación / reseña de confianza.
+
+Ruta: /(app)/profile
+Archivo: apps/mobile/app/(app)/profile.tsx
+Nombre: ProfileScreen (Mi Perfil de Usuario)
+Acceso: Rol USER y Rol ADMIN
+Descripción:
+  - Visualización de datos de perfil, rol y tipo de actor.
+  - Gestión y vinculación a Organizaciones / Asociaciones de recicladores.
+  - Solicitud de certificación institucional y verificación de entidad.
+  - Acceso a pantalla de edición de datos y botón de cierre de sesión seguro.
+
+Ruta: /(app)/edit-profile
+Archivo: apps/mobile/app/(app)/edit-profile.tsx
+Nombre: EditProfileScreen (Edición de Datos de Perfil)
+Acceso: Rol USER y Rol ADMIN
+Descripción:
+  - Actualización de nombre completo, número de teléfono y localidad distrital.
+
+
+--------------------------------------------------------------------------------
+B. VISTAS EXCLUSIVAS DE ADMINISTRACIÓN DISTRITAL (Rol ADMIN)
+--------------------------------------------------------------------------------
+
+Ruta: /(app)/admin
+Archivo: apps/mobile/app/(app)/admin.tsx
+Nombre: AdminDashboardScreen (Panel de Control y Gobernanza Distrital)
+Acceso: Exclusivo Rol ADMIN
+Descripción:
+  - Indicadores clave de impacto (KPIs): Total de usuarios, organizaciones,
+    publicaciones activas, operaciones cerradas y toneladas recuperadas.
+  - Balance de masa distrital y desglose de materiales por localidad de Bogotá.
+  - Módulo de Verificaciones Institucionales: Auditoría, aprobación o rechazo
+    motivado de organizaciones y empresas recicladoras.
+  - Auditoría y gestión del catálogo oficial de categorías y unidades de medida.
+
+Ruta: /(app)/users
+Archivo: apps/mobile/app/(app)/users.tsx
+Nombre: AdminUsersScreen (Gestión de Usuarios de la Plataforma)
+Acceso: Exclusivo Rol ADMIN
+Descripción:
+  - Listado general de usuarios registrados en el sistema.
+  - Filtros por rol (ADMIN/USER), tipo de actor distrital y estado de verificación.
+  - Visualización de fecha de registro y detalles de contacto.
+
+
+================================================================================
+5. COMPONENTE DE NAVEGACIÓN INFERIOR (BottomTabBar)
+================================================================================
+Archivo: apps/mobile/src/components/BottomTabBar.tsx
+Renderizado en vistas de usuario regular (Rol USER). Contiene 5 elementos:
+
+  1. Inicio: Redirige a '/(app)' (HomeScreen)
+  2. Publicar: Redirige a '/(app)/publish' (PublishScreen)
+  3. Botón Central Flotante (+): Elevado con sombra, crea publicación rápida en '/(app)/publish'
+  4. Chat: Redirige a '/(app)/chat' (ChatScreen con badge de mensajes no leídos)
+  5. Perfil: Redirige a '/(app)/profile' (ProfileScreen)
+
+
+================================================================================
+6. MAPEO DE VISTAS CON ENDPOINTS DE BACKEND (API REST)
+================================================================================
+
+Vista / Ruta                | Endpoints Principales del Backend
+----------------------------+---------------------------------------------------
+/(auth)/login               | POST /auth/login
+/(auth)/register            | POST /auth/register
+/(app) / (HomeScreen)       | GET  /catalog/categories
+                            | GET  /catalog/units
+                            | GET  /publications/search
+                            | GET  /matches/my-suggestions
+/(app)/publish              | POST /publications
+                            | GET  /publications/search?ownerId=...
+                            | DELETE /publications/:id
+/(app)/publication/[id]     | GET  /publications/:id
+                            | GET  /publications/:id/matches
+/(app)/edit-publication/[id]| GET  /publications/:id
+                            | PATCH /publications/:id
+/(app)/chat                 | GET  /conversations
+                            | GET  /conversations/:id
+                            | POST /conversations/:id/messages
+                            | POST /conversations/:id/proposals
+                            | POST /conversations/proposals/:id/accept
+                            | GET  /operations
+                            | PATCH /operations/:id/schedule
+                            | PATCH /operations/:id/collect
+                            | POST  /operations/:id/evidences
+                            | PATCH /operations/:id/receive
+                            | PATCH /operations/:id/close
+                            | POST  /operations/:id/reviews
+/(app)/profile              | GET  /users/me
+                            | GET  /organizations
+                            | POST /organizations
+                            | POST /organizations/:id/verification
+/(app)/edit-profile         | PATCH /users/me
+/(app)/admin                | GET  /admin/kpis
+                            | GET  /admin/localities
+                            | GET  /admin/materials
+                            | GET  /admin/operations
+                            | POST /admin/organizations/:id/verify
+/(app)/users                | GET  /admin/users
+================================================================================

@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -12,7 +13,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
+import { useAuth } from '../../src/context/AuthContext';
 import {
   MaterialCategoryDto,
   UnitDto,
@@ -20,10 +23,11 @@ import {
   PublicationType,
   OrganizationDto,
   CreatePublicationInput,
-  BOGOTA_LOCALITIES,
+  COLOMBIA_MUNICIPALITIES,
 } from '@data-circular/shared';
 import { Tokens } from '../../src/theme/tokens';
 import { BrandHeader } from '../../src/components/BrandHeader';
+import { navigateBackOrFallback } from '../../src/navigation';
 import { BottomTabBar } from '../../src/components/BottomTabBar';
 import { ErrorBanner } from '../../src/components/ErrorBanner';
 import { LocalityPicker } from '../../src/components/LocalityPicker';
@@ -33,6 +37,15 @@ import { OrganizationsApi } from '../../src/api/organizations.api';
 
 export default function PublishScreen() {
   const router = useRouter();
+  const handleBack = () =>
+    navigateBackOrFallback(
+      () => router.canGoBack(),
+      () => router.back(),
+      () => router.replace('/(app)/publish')
+    );
+  const { user } = useAuth();
+  const canManagePublications = user?.role === 'USER' && user.userType === 'GENERATOR';
+  const type: PublicationType = 'OFFER';
 
   // Tab activo: 'create' | 'mine'
   const [activeSubTab, setActiveSubTab] = useState<'create' | 'mine'>('create');
@@ -44,14 +57,14 @@ export default function PublishScreen() {
   const [myOrgs, setMyOrgs] = useState<OrganizationDto[]>([]);
 
   // Formulario de nueva publicación
-  const [type, setType] = useState<PublicationType>('OFFER');
   const [selectedParentId, setSelectedParentId] = useState<string>('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [quantity, setQuantity] = useState<string>('');
   const [selectedUnitId, setSelectedUnitId] = useState<string>('');
   const [selectedOrgId, setSelectedOrgId] = useState<string>('');
+  const [description, setDescription] = useState<string>('');
   const [address, setAddress] = useState<string>('');
-  const [locality, setLocality] = useState<string>('Fontibón');
+  const [locality, setLocality] = useState<string>('Bogotá D.C.');
   const [condition, setCondition] = useState<string>('');
   const [photoUrl, setPhotoUrl] = useState<string>('');
   const [isUrgent, setIsUrgent] = useState<boolean>(false);
@@ -68,8 +81,10 @@ export default function PublishScreen() {
 
   // Cargar datos iniciales
   useEffect(() => {
-    loadInitialData();
-  }, []);
+    if (canManagePublications) {
+      loadInitialData();
+    }
+  }, [canManagePublications]);
 
   const loadInitialData = async () => {
     setLoading(true);
@@ -114,8 +129,42 @@ export default function PublishScreen() {
     }
   };
 
+  const handleChoosePhoto = async () => {
+    setErrorMessage(null);
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      setErrorMessage('Permite el acceso a la galería para seleccionar una fotografía.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      quality: 0.7,
+      base64: true,
+    });
+    if (result.canceled) return;
+
+    const asset = result.assets[0];
+    if (asset.fileSize && asset.fileSize > 2 * 1024 * 1024) {
+      setErrorMessage('La imagen debe pesar menos de 2 MB.');
+      return;
+    }
+    if (!asset.base64) {
+      setErrorMessage('No se pudo leer la imagen seleccionada. Intenta con otra fotografía.');
+      return;
+    }
+
+    const imageData = `data:${asset.mimeType || 'image/jpeg'};base64,${asset.base64}`;
+    if (imageData.length > 3_000_000) {
+      setErrorMessage('La imagen es demasiado pesada; selecciona una fotografía más pequeña.');
+      return;
+    }
+    setPhotoUrl(imageData);
+  };
+
   // Cargar mis publicaciones
-  const loadMyPublications = async () => {
+  const loadMyPublications = useCallback(async () => {
     setLoadingMine(true);
     try {
       const res = await PublicationsApi.getMine(1, 50);
@@ -125,16 +174,22 @@ export default function PublishScreen() {
     } finally {
       setLoadingMine(false);
     }
-  };
+  }, []);
 
-  useEffect(() => {
-    if (activeSubTab === 'mine') {
-      loadMyPublications();
-    }
-  }, [activeSubTab]);
+  useFocusEffect(
+    useCallback(() => {
+      if (canManagePublications && activeSubTab === 'mine') {
+        void loadMyPublications();
+      }
+    }, [activeSubTab, canManagePublications, loadMyPublications])
+  );
 
   // Enviar formulario
   const handleSubmit = async () => {
+    if (!canManagePublications) {
+      setErrorMessage('Solo los usuarios operativos pueden publicar materiales.');
+      return;
+    }
     setErrorMessage(null);
     setSuccessMessage(null);
 
@@ -148,7 +203,7 @@ export default function PublishScreen() {
       return;
     }
     if (!address.trim() || address.trim().length < 5) {
-      setErrorMessage('Ingresa una dirección válida en Bogotá (mínimo 5 caracteres).');
+      setErrorMessage('Ingresa una dirección válida (mínimo 5 caracteres).');
       return;
     }
 
@@ -159,9 +214,10 @@ export default function PublishScreen() {
         categoryId: selectedCategoryId,
         quantity: numQty,
         unitId: selectedUnitId,
+        description: description.trim() || undefined,
         organizationId: selectedOrgId || undefined,
         locationAddress: address.trim(),
-        locationCity: 'Bogotá D.C.',
+        locationCity: 'Colombia',
         locationArea: locality,
         condition: condition.trim() || undefined,
         photoUrl: photoUrl.trim() || undefined,
@@ -171,6 +227,7 @@ export default function PublishScreen() {
       const created = await PublicationsApi.create(payload);
       setSuccessMessage('¡Publicación creada exitosamente!');
       setQuantity('');
+      setDescription('');
       setAddress('');
       setCondition('');
       setPhotoUrl('');
@@ -189,6 +246,10 @@ export default function PublishScreen() {
 
   // Cerrar publicación
   const handleClosePublication = async (id: string) => {
+    if (!canManagePublications) {
+      setErrorMessage('No tienes permiso para administrar publicaciones.');
+      return;
+    }
     Alert.alert(
       'Cerrar Publicación',
       '¿Deseas dar por terminada esta publicación de material?',
@@ -210,11 +271,22 @@ export default function PublishScreen() {
     );
   };
 
+  if (!canManagePublications) {
+    return (
+      <View style={styles.container}>
+        <BrandHeader title="Publicaciones" showBack onBack={handleBack} />
+        <View style={styles.centerLoading}>
+          <Text style={styles.loadingText}>Tu perfil solo tiene acceso a la consulta de materiales.</Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <BrandHeader
         title="Gestión de Materiales"
-        subtitle="Ofertas y Demandas de Economía Circular"
+        subtitle="Ofertas de material para economía circular"
         curved={true}
       />
 
@@ -257,30 +329,15 @@ export default function PublishScreen() {
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            {/* Tipo: OFERTA vs NECESIDAD */}
             <Text style={styles.sectionTitle}>Tipo de Transacción</Text>
             <View style={styles.typeRow}>
-              <TouchableOpacity
-                style={[styles.typeOption, type === 'OFFER' && styles.typeOptionActive]}
-                onPress={() => setType('OFFER')}
-              >
+              <View style={[styles.typeOption, styles.typeOptionActive]}>
                 <Text style={styles.typeIcon}>📦</Text>
-                <Text style={[styles.typeTitle, type === 'OFFER' && styles.typeTitleActive]}>
+                <Text style={[styles.typeTitle, styles.typeTitleActive]}>
                   Tengo Material (Oferta)
                 </Text>
-                <Text style={styles.typeDesc}>Generadores y recuperadores</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.typeOption, type === 'NEED' && styles.typeOptionActiveNeed]}
-                onPress={() => setType('NEED')}
-              >
-                <Text style={styles.typeIcon}>🏭</Text>
-                <Text style={[styles.typeTitle, type === 'NEED' && styles.typeTitleActiveNeed]}>
-                  Requiero Material (Demanda)
-                </Text>
-                <Text style={styles.typeDesc}>Transformadores y compradores</Text>
-              </TouchableOpacity>
+                <Text style={styles.typeDesc}>Publicación exclusiva para generadores</Text>
+              </View>
             </View>
 
             {/* Categoría y Subcategoría */}
@@ -313,6 +370,18 @@ export default function PublishScreen() {
                 </TouchableOpacity>
               ))}
             </ScrollView>
+
+            <Text style={styles.fieldLabel}>Descripción del Material</Text>
+            <TextInput
+              style={[styles.textInput, styles.descriptionInput]}
+              placeholder="Describe el material, sus características o composición"
+              placeholderTextColor="#9AA0A6"
+              value={description}
+              onChangeText={setDescription}
+              multiline
+              maxLength={1000}
+              textAlignVertical="top"
+            />
 
             {/* Cantidad y Unidad */}
             <View style={styles.row}>
@@ -356,14 +425,14 @@ export default function PublishScreen() {
               onChangeText={setCondition}
             />
 
-            {/* Ubicación distrital */}
+            {/* Ubicación territorial */}
             <LocalityPicker
-              label="Localidad de Origen / Destino en Bogotá *"
+              label="Ciudad o Municipio de Origen / Destino *"
               selectedLocality={locality}
               onSelect={setLocality}
             />
 
-            <Text style={styles.fieldLabel}>Dirección en Bogotá D.C. *</Text>
+            <Text style={styles.fieldLabel}>Dirección de Ubicación *</Text>
             <TextInput
               style={styles.textInput}
               placeholder="ej: Carrera 68D # 13-40, Zona Industrial"
@@ -372,17 +441,25 @@ export default function PublishScreen() {
               onChangeText={setAddress}
             />
 
-            {/* URL de Fotografía */}
-            <Text style={styles.fieldLabel}>Enlace a Fotografía (Opcional)</Text>
-            <TextInput
-              style={styles.textInput}
-              placeholder="https://..."
-              placeholderTextColor="#9AA0A6"
-              value={photoUrl}
-              onChangeText={setPhotoUrl}
-              keyboardType="url"
-              autoCapitalize="none"
-            />
+            <Text style={styles.fieldLabel}>Fotografía (Opcional)</Text>
+            {photoUrl ? (
+              <Image source={{ uri: photoUrl }} style={styles.photoPreview} resizeMode="cover" />
+            ) : null}
+            <View style={styles.photoActions}>
+              <TouchableOpacity style={styles.photoButton} onPress={() => void handleChoosePhoto()}>
+                <Text style={styles.photoButtonText}>
+                  {photoUrl ? 'Cambiar desde la galería' : 'Seleccionar de la galería'}
+                </Text>
+              </TouchableOpacity>
+              {photoUrl ? (
+                <TouchableOpacity
+                  style={styles.removePhotoButton}
+                  onPress={() => setPhotoUrl('')}
+                >
+                  <Text style={styles.removePhotoText}>Quitar</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
 
             {/* Switch de Urgencia */}
             <TouchableOpacity
@@ -462,6 +539,14 @@ export default function PublishScreen() {
               </View>
 
               <Text style={styles.mineTitle}>{item.category?.name || 'Material'}</Text>
+              {item.description ? (
+                <Text style={styles.mineDescription} numberOfLines={2}>
+                  {item.description}
+                </Text>
+              ) : null}
+              {item.requiresTransport ? (
+                <Text style={styles.mineTransport}>🚛 Requiere transporte</Text>
+              ) : null}
               <Text style={styles.mineDetails}>
                 Cantidad: {item.quantity} {item.unit?.abbreviation || 'und'} • 📍 {item.locationArea || item.locationCity}
               </Text>
@@ -477,6 +562,13 @@ export default function PublishScreen() {
                   onPress={() => router.push(`/(app)/publication/${item.id}` as any)}
                 >
                   <Text style={styles.mineViewBtnText}>Ver Detalle y Matches</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.mineViewBtn}
+                  onPress={() => router.push(`/(app)/edit-publication/${item.id}` as any)}
+                >
+                  <Text style={styles.mineViewBtnText}>Editar</Text>
                 </TouchableOpacity>
 
                 {item.status === 'ACTIVE' && (
@@ -554,8 +646,8 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 14,
-    fontWeight: '800',
-    color: Tokens.colors.primaryDark,
+    fontWeight: '600',
+    color: Tokens.colors.brand.orangeStrong,
     marginTop: 14,
     marginBottom: 8,
   },
@@ -670,6 +762,41 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 14,
     color: Tokens.colors.textDark,
+  },
+  photoPreview: {
+    width: '100%',
+    height: 180,
+    borderRadius: 10,
+    marginBottom: 8,
+    backgroundColor: '#E8EFEB',
+  },
+  photoActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  photoButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: '#EAF6EE',
+  },
+  photoButtonText: {
+    color: Tokens.colors.primaryDark,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  removePhotoButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+  },
+  removePhotoText: {
+    color: '#B42318',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  descriptionInput: {
+    minHeight: 88,
   },
   unitPill: {
     backgroundColor: '#FFFFFF',
@@ -810,6 +937,17 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: Tokens.colors.textDark,
+  },
+  mineDescription: {
+    fontSize: 12,
+    color: Tokens.colors.textMuted,
+    marginTop: 3,
+  },
+  mineTransport: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#0F548C',
+    marginTop: 3,
   },
   mineDetails: {
     fontSize: 12,

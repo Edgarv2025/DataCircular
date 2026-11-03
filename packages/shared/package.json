@@ -2,6 +2,9 @@
   "name": "@data-circular/shared",
   "version": "0.1.0",
   "private": true,
+  "author": "Edgar Vásquez",
+  "owner": "Fundación IMARA",
+  "copyright": "© 2026 Fundación IMARA",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {

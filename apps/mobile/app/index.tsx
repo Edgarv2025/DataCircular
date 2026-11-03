@@ -18,9 +18,8 @@ export default function WelcomeScreen() {
   const { isAuthenticated, isLoading, user } = useAuth();
 
   useEffect(() => {
-    // Si ya está autenticado, redirigir automáticamente al perfil
     if (!isLoading && isAuthenticated) {
-      router.replace('/(app)/profile');
+      router.replace('/(app)');
     }
   }, [isLoading, isAuthenticated]);
 
@@ -36,9 +35,9 @@ export default function WelcomeScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Banner Territorial Bogotá */}
+        {/* Banner Territorial Nacional */}
         <View style={styles.badgeContainer}>
-          <Text style={styles.badgeText}>📍 BOGOTÁ D.C. • COLOMBIA</Text>
+          <Text style={styles.badgeText}>📍 COBERTURA NACIONAL • COLOMBIA</Text>
         </View>
 
         {/* Encabezado Principal */}
@@ -54,25 +53,25 @@ export default function WelcomeScreen() {
 
         {/* Tarjeta de Propósito Territorial */}
         <Card style={styles.purposeCard}>
-          <Text style={styles.purposeTitle}>Trazabilidad de Residuos en Bogotá</Text>
+          <Text style={styles.purposeTitle}>Trazabilidad de Residuos a Nivel Nacional</Text>
           <Text style={styles.purposeDescription}>
             Conectamos generadores, recuperadores ambientales de oficio, transportadores y
-            empresas transformadoras en las 20 localidades de Bogotá D.C.
+            empresas transformadoras en ciudades y municipios de toda Colombia.
           </Text>
 
           <View style={styles.featureRow}>
             <View style={styles.featureItem}>
-              <Text style={styles.featureIcon}>🏙️</Text>
-              <Text style={styles.featureLabel}>20 Localidades</Text>
-              <Text style={styles.featureSub}>Cobertura Distrital</Text>
+              <Text style={styles.featureIcon}></Text>
+              <Text style={styles.featureLabel}>Nivel Nacional</Text>
+              <Text style={styles.featureSub}>Ciudades y Municipios</Text>
             </View>
             <View style={styles.featureItem}>
-              <Text style={styles.featureIcon}>💵</Text>
+              <Text style={styles.featureIcon}></Text>
               <Text style={styles.featureLabel}>Precios Justos</Text>
               <Text style={styles.featureSub}>Moneda Pesos COP</Text>
             </View>
             <View style={styles.featureItem}>
-              <Text style={styles.featureIcon}>🌱</Text>
+              <Text style={styles.featureIcon}></Text>
               <Text style={styles.featureLabel}>Res. 2184</Text>
               <Text style={styles.featureSub}>MinAmbiente Col.</Text>
             </View>
@@ -82,13 +81,13 @@ export default function WelcomeScreen() {
         {/* Resumen de Actores del Ecosistema */}
         <View style={styles.actorsContainer}>
           <View style={styles.actorChip}>
-            <Text style={styles.actorChipText}>🏢 Generadores Comerciales</Text>
+            <Text style={styles.actorChipText}> Generadores Comerciales</Text>
           </View>
           <View style={styles.actorChip}>
-            <Text style={styles.actorChipText}>🤝 Recicladores de Oficio</Text>
+            <Text style={styles.actorChipText}> Recicladores de Oficio</Text>
           </View>
           <View style={styles.actorChip}>
-            <Text style={styles.actorChipText}>🏭 Transformadores Industriales</Text>
+            <Text style={styles.actorChipText}> Transformadores Industriales</Text>
           </View>
         </View>
 
@@ -117,7 +116,7 @@ export default function WelcomeScreen() {
         </View>
 
         <Text style={styles.legalFooter}>
-          DATA_CIRCULAR v0.1.0 • Práctica Universitaria Fundación IMARA
+          DATA_CIRCULAR v0.1.0 • Fundación IMARA
           {'\n'}Cumplimiento Ley 1581 de 2012 de Protección de Datos Personales
         </Text>
       </ScrollView>
@@ -182,7 +181,8 @@ const styles = StyleSheet.create({
   },
   brandSubtitle: {
     fontSize: 14,
-    color: Colors.textMuted,
+    color: Colors.brandOrangeDark,
+    fontWeight: '600',
     textAlign: 'center',
     marginTop: 4,
   },
@@ -190,6 +190,7 @@ const styles = StyleSheet.create({
     width: '100%',
     padding: 18,
     marginVertical: 12,
+    backgroundColor: Colors.brandOrangeTint,
   },
   purposeTitle: {
     fontSize: 16,

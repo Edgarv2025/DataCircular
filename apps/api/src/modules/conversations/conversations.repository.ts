@@ -479,23 +479,33 @@ export class ConversationsRepository {
       }),
     ]);
 
-    // Calcular conteo de no leídos para cada conversación
-    const withUnread = await Promise.all(
-      conversations.map(async (conv) => {
-        const state = conv.participantStates.find((s) => s.userId === userId);
-        const unreadCount = await prisma.message.count({
-          where: {
-            conversationId: conv.id,
-            senderUserId: { not: userId },
-            ...(state?.lastReadAt ? { createdAt: { gt: state.lastReadAt } } : {}),
-          },
-        });
-        return {
-          ...conv,
-          unreadCount,
-        };
-      })
-    );
+    const unreadByConversation = new Map<string, number>();
+    if (conversations.length > 0) {
+      const unreadRows = await prisma.$queryRaw<
+        Array<{ conversationId: string; unreadCount: number }>
+      >(Prisma.sql`
+        SELECT m.conversation_id AS "conversationId", COUNT(*)::int AS "unreadCount"
+        FROM messages m
+        LEFT JOIN conversation_participant_states s
+          ON s.conversation_id = m.conversation_id
+          AND s.user_id = ${userId}::uuid
+        WHERE m.conversation_id IN (${Prisma.join(
+          conversations.map(({ id }) => Prisma.sql`${id}::uuid`)
+        )})
+          AND m.sender_user_id IS NOT NULL
+          AND m.sender_user_id <> ${userId}::uuid
+          AND (s.last_read_at IS NULL OR m.created_at > s.last_read_at)
+        GROUP BY m.conversation_id
+      `);
+      for (const row of unreadRows) {
+        unreadByConversation.set(row.conversationId, row.unreadCount);
+      }
+    }
+
+    const withUnread = conversations.map((conv) => ({
+      ...conv,
+      unreadCount: unreadByConversation.get(conv.id) ?? 0,
+    }));
 
     return {
       total,
@@ -510,41 +520,38 @@ export class ConversationsRepository {
    * Conteo total de mensajes no leídos para un usuario a lo largo de todas sus conversaciones.
    */
   async getGlobalUnreadCount(userId: string, userOrgIds: string[]): Promise<number> {
-    const conversations = await prisma.conversation.findMany({
-      where: {
-        OR: [
-          { initiatorUserId: userId },
-          { counterpartUserId: userId },
-          ...(userOrgIds.length > 0
-            ? [
-                { initiatorOrganizationId: { in: userOrgIds } },
-                { counterpartOrganizationId: { in: userOrgIds } },
-              ]
-            : []),
-        ],
-        status: ConversationStatus.OPEN,
-      },
-      include: {
-        participantStates: {
-          where: { userId },
-        },
-      },
-    });
+    const initiatorOrgCondition = userOrgIds.length
+      ? Prisma.sql`OR c.initiator_organization_id IN (${Prisma.join(
+          userOrgIds.map((id) => Prisma.sql`${id}::uuid`)
+        )})`
+      : Prisma.empty;
+    const counterpartOrgCondition = userOrgIds.length
+      ? Prisma.sql`OR c.counterpart_organization_id IN (${Prisma.join(
+          userOrgIds.map((id) => Prisma.sql`${id}::uuid`)
+        )})`
+      : Prisma.empty;
 
-    let totalUnread = 0;
-    for (const conv of conversations) {
-      const state = conv.participantStates[0];
-      const count = await prisma.message.count({
-        where: {
-          conversationId: conv.id,
-          senderUserId: { not: userId },
-          ...(state?.lastReadAt ? { createdAt: { gt: state.lastReadAt } } : {}),
-        },
-      });
-      totalUnread += count;
-    }
+    const [result] = await prisma.$queryRaw<Array<{ unreadCount: number }>>(Prisma.sql`
+      SELECT COUNT(m.id)::int AS "unreadCount"
+      FROM conversations c
+      LEFT JOIN conversation_participant_states s
+        ON s.conversation_id = c.id
+        AND s.user_id = ${userId}::uuid
+      LEFT JOIN messages m
+        ON m.conversation_id = c.id
+        AND m.sender_user_id IS NOT NULL
+        AND m.sender_user_id <> ${userId}::uuid
+        AND (s.last_read_at IS NULL OR m.created_at > s.last_read_at)
+      WHERE c.status = ${ConversationStatus.OPEN}::"ConversationStatus"
+        AND (
+          c.initiator_user_id = ${userId}::uuid
+          OR c.counterpart_user_id = ${userId}::uuid
+          ${initiatorOrgCondition}
+          ${counterpartOrgCondition}
+        )
+    `);
 
-    return totalUnread;
+    return result.unreadCount;
   }
 
   /**

@@ -6,6 +6,18 @@ generator client {
   output   = "../src/generated/prisma-client"
 }
 
+model OrganizationMaterialCategory {
+  organizationId String           @map("organization_id") @db.Uuid
+  categoryId     String           @map("category_id") @db.Uuid
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  category       MaterialCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@id([organizationId, categoryId])
+  @@index([categoryId])
+  @@map("organization_material_categories")
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -54,12 +66,19 @@ model User {
   memberships  OrganizationMember[] @relation("UserMemberships")
   invitedMembers OrganizationMember[] @relation("InvitedMembers")
   publications MaterialPublication[] @relation("UserPublications")
+  transportMaterialCategories TransportMaterialCategory[]
   initiatedConversations Conversation[] @relation("InitiatedConversations")
   counterpartConversations Conversation[] @relation("CounterpartConversations")
   conversationStates ConversationParticipantState[]
   sentMessages Message[] @relation("SentMessages")
   proposals Proposal[] @relation("UserProposals")
   respondedProposals Proposal[] @relation("UserRespondedProposals")
+  operationsAsSeller Operation[] @relation("SellerOperations")
+  operationsAsBuyer  Operation[] @relation("BuyerOperations")
+  operationsAsTransporter Operation[] @relation("TransporterOperations")
+  operationEvidences OperationEvidence[] @relation("UploadedEvidences")
+  givenReviews       OperationReview[] @relation("GivenReviews")
+  receivedReviews    OperationReview[] @relation("ReceivedReviews")
 
   @@index([status, deletedAt])
   @@index([email])
@@ -132,11 +151,14 @@ model Organization {
   deletedAt          DateTime?          @map("deleted_at") @db.Timestamptz(6)
 
   members            OrganizationMember[]
+  materialCategories OrganizationMaterialCategory[]
   roles              Role[]
   publications       MaterialPublication[] @relation("OrganizationPublications")
   initiatedConversations Conversation[] @relation("OrgInitiatedConversations")
   counterpartConversations Conversation[] @relation("OrgCounterpartConversations")
   proposals          Proposal[] @relation("OrgProposals")
+  sellerOperations   Operation[] @relation("OrgSellerOperations")
+  buyerOperations    Operation[] @relation("OrgBuyerOperations")
 
   @@index([status, deletedAt])
   @@index([orgType])
@@ -239,6 +261,9 @@ model MaterialCategory {
   parent        MaterialCategory?     @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
   subcategories MaterialCategory[]    @relation("CategoryHierarchy")
   publications  MaterialPublication[]
+  transporters  TransportMaterialCategory[]
+  organizations OrganizationMaterialCategory[]
+  operations    Operation[]
 
   @@unique([parentId, name])
   @@index([parentId])
@@ -257,11 +282,23 @@ model Unit {
 
   publications MaterialPublication[]
   proposals    Proposal[]
+  operations   Operation[]
 
   @@map("units")
 }
 
-/// Publicación de oferta o necesidad de material aprovechable
+model TransportMaterialCategory {
+  userId     String           @map("user_id") @db.Uuid
+  categoryId String           @map("category_id") @db.Uuid
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category   MaterialCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([userId, categoryId])
+  @@index([categoryId])
+  @@map("transport_material_categories")
+}
+
+/// Publicación de oferta de material aprovechable
 model MaterialPublication {
   id              String            @id @default(uuid()) @db.Uuid
   type            PublicationType
@@ -270,6 +307,8 @@ model MaterialPublication {
   categoryId      String            @map("category_id") @db.Uuid
   quantity        Decimal           @db.Decimal(12, 2)
   unitId          String            @map("unit_id") @db.Uuid
+  description     String?           @db.Text
+  requiresTransport Boolean         @default(false) @map("requires_transport")
   locationAddress String            @map("location_address") @db.VarChar(255)
   locationCity    String?           @default("Bogotá D.C.") @map("location_city") @db.VarChar(100)
   locationArea    String?           @map("location_area") @db.VarChar(100)
@@ -288,6 +327,7 @@ model MaterialPublication {
   unit          Unit              @relation(fields: [unitId], references: [id], onDelete: Restrict)
   conversations Conversation[]
   proposals     Proposal[]
+  operations    Operation[]
 
   @@index([type])
   @@index([status, deletedAt])
@@ -406,6 +446,7 @@ model Proposal {
   parentProposal         Proposal?           @relation("ProposalHierarchy", fields: [parentProposalId], references: [id], onDelete: SetNull)
   counterProposals       Proposal[]          @relation("ProposalHierarchy")
   respondedByUser        User?               @relation("UserRespondedProposals", fields: [respondedByUserId], references: [id], onDelete: SetNull)
+  operation              Operation?
 
   @@index([conversationId])
   @@index([publicationId])
@@ -414,4 +455,120 @@ model Proposal {
   @@map("proposals")
 }
 
+/// Estados del ciclo de vida de una operación logística (Fase 11)
+enum OperationStatus {
+  ACCEPTED
+  SCHEDULED
+  COLLECTING
+  EVIDENCE
+  RECEIVED
+  CLOSED
+  CANCELLED
+}
+
+/// Tipos de evidencia asociados a una operación (Fase 11)
+enum EvidenceType {
+  WEIGHING_TICKET
+  PHOTO
+  SIGNATURE
+  DOCUMENT
+}
+
+/// Operación de economía circular y logística
+model Operation {
+  id                        String              @id @default(uuid()) @db.Uuid
+  code                      String              @unique @db.VarChar(50)
+  proposalId                String              @unique @map("proposal_id") @db.Uuid
+  publicationId             String              @map("publication_id") @db.Uuid
+  sellerUserId              String              @map("seller_user_id") @db.Uuid
+  sellerOrganizationId      String?             @map("seller_organization_id") @db.Uuid
+  buyerUserId               String              @map("buyer_user_id") @db.Uuid
+  buyerOrganizationId       String?             @map("buyer_organization_id") @db.Uuid
+  transporterUserId         String?             @map("transporter_user_id") @db.Uuid
+  transporterOrganizationId String?             @map("transporter_organization_id") @db.Uuid
+  materialCategoryId        String              @map("material_category_id") @db.Uuid
+  quantity                  Decimal             @db.Decimal(12, 2)
+  unitId                    String              @map("unit_id") @db.Uuid
+  agreedPriceCop            Decimal?            @map("agreed_price_cop") @db.Decimal(12, 2)
+  status                    OperationStatus     @default(ACCEPTED)
+  scheduledDate             DateTime?           @map("scheduled_date") @db.Timestamptz(6)
+  scheduledTimeSlot         String?             @map("scheduled_time_slot") @db.VarChar(50)
+  pickupAddress             String?             @map("pickup_address") @db.VarChar(255)
+  pickupCity                String?             @default("Bogotá D.C.") @map("pickup_city") @db.VarChar(100)
+  pickupArea                String?             @map("pickup_area") @db.VarChar(100)
+  deliveryAddress           String?             @map("delivery_address") @db.VarChar(255)
+  deliveryCity              String?             @default("Bogotá D.C.") @map("delivery_city") @db.VarChar(100)
+  deliveryArea              String?             @map("delivery_area") @db.VarChar(100)
+  transportNotes            String?             @map("transport_notes") @db.Text
+  vehiclePlate              String?             @map("vehicle_plate") @db.VarChar(20)
+  driverName                String?             @map("driver_name") @db.VarChar(100)
+  actualWeight              Decimal?            @map("actual_weight") @db.Decimal(12, 2)
+  receivedNotes             String?             @map("received_notes") @db.Text
+  closedAt                  DateTime?           @map("closed_at") @db.Timestamptz(6)
+  cancelledAt               DateTime?           @map("cancelled_at") @db.Timestamptz(6)
+  cancellationReason        String?             @map("cancellation_reason") @db.Text
+  createdAt                 DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                 DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  proposal                  Proposal            @relation(fields: [proposalId], references: [id], onDelete: Restrict)
+  publication               MaterialPublication @relation(fields: [publicationId], references: [id], onDelete: Restrict)
+  sellerUser                User                @relation("SellerOperations", fields: [sellerUserId], references: [id], onDelete: Restrict)
+  sellerOrganization        Organization?       @relation("OrgSellerOperations", fields: [sellerOrganizationId], references: [id], onDelete: SetNull)
+  buyerUser                 User                @relation("BuyerOperations", fields: [buyerUserId], references: [id], onDelete: Restrict)
+  buyerOrganization         Organization?       @relation("OrgBuyerOperations", fields: [buyerOrganizationId], references: [id], onDelete: SetNull)
+  transporterUser           User?               @relation("TransporterOperations", fields: [transporterUserId], references: [id], onDelete: SetNull)
+  materialCategory          MaterialCategory    @relation(fields: [materialCategoryId], references: [id], onDelete: Restrict)
+  unit                      Unit                @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  evidences                 OperationEvidence[]
+  reviews                   OperationReview[]
+
+  @@index([status])
+  @@index([sellerUserId])
+  @@index([buyerUserId])
+  @@index([transporterUserId])
+  @@index([pickupArea])
+  @@index([createdAt])
+  @@map("operations")
+}
+
+/// Evidencias documentales y de pesaje asociadas a una operación (Fase 11)
+model OperationEvidence {
+  id               String       @id @default(uuid()) @db.Uuid
+  operationId      String       @map("operation_id") @db.Uuid
+  type             EvidenceType
+  fileUrl          String       @map("file_url") @db.Text
+  description      String?      @db.Text
+  weightKg         Decimal?     @map("weight_kg") @db.Decimal(12, 2)
+  uploadedByUserId String       @map("uploaded_by_user_id") @db.Uuid
+  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  operation        Operation    @relation(fields: [operationId], references: [id], onDelete: Cascade)
+  uploadedByUser   User         @relation("UploadedEvidences", fields: [uploadedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([operationId])
+  @@map("operation_evidences")
+}
+
+/// Evaluaciones y calificaciones de operaciones finalizadas (Fase 12)
+model OperationReview {
+  id                   String    @id @default(uuid()) @db.Uuid
+  operationId          String    @map("operation_id") @db.Uuid
+  reviewerUserId       String    @map("reviewer_user_id") @db.Uuid
+  targetUserId         String    @map("target_user_id") @db.Uuid
+  score                Int       @db.SmallInt
+  punctualityScore     Int?      @map("punctuality_score") @db.SmallInt
+  materialQualityScore Int?      @map("material_quality_score") @db.SmallInt
+  fulfillmentScore     Int?      @map("fulfillment_score") @db.SmallInt
+  comment              String?   @db.Text
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  operation            Operation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+  reviewerUser         User      @relation("GivenReviews", fields: [reviewerUserId], references: [id], onDelete: Cascade)
+  targetUser           User      @relation("ReceivedReviews", fields: [targetUserId], references: [id], onDelete: Cascade)
+
+  @@unique([operationId, reviewerUserId])
+  @@index([operationId])
+  @@index([targetUserId])
+  @@map("operation_reviews")
+}
 

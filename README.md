@@ -49,7 +49,7 @@ Esto instalará las dependencias de todos los workspaces (`apps/api`, `apps/mobi
    ```env
    NODE_ENV=development
    PORT=3000
-   DATABASE_URL="postgresql://postgres:TU_PASSWORD@localhost:5432/data_circular_dev?schema=public"
+   DATABASE_URL="postgresql://<USUARIO>:<CONTRASE?A>@localhost:5432/data_circular_dev?schema=public"
    ```
 
 ---
@@ -84,21 +84,40 @@ El registro solicita el tipo de participante (generador, reciclador, transportad
 
 ---
 
-## 7. Ejecución de Pruebas Automatizadas
+## 7. Credenciales del Usuario Administrador
 
-El proyecto cuenta con pruebas automáticas extremo a extremo tanto para el backend como para los flujos móviles de la Fase 5:
+Para probar y evaluar la aplicación con permisos completos de administración:
+
+| Parámetro | Administrador Principal | Administrador Respaldo |
+|---|---|---|
+| **Correo Electrónico** | `admin@datacircular.com` | `admin@imara.org.co` |
+| **Contraseña** | No se publica en el repositorio. Solicítala al administrador por un canal seguro. | No se publica en el repositorio. Solicítala al administrador por un canal seguro. |
+| **Rol en Sistema** | `ADMIN` | `ADMIN` |
+| **Pantalla Principal** | Redirige automáticamente a `/(app)/admin` | Redirige a `/(app)/admin` |
+
+---
+
+## 8. Ejecución de Pruebas Automatizadas
+
+El proyecto cuenta con suites de pruebas automáticas completas tanto para backend como para frontend móvil y flujo integral de punta a punta:
 
 ```bash
-# Pruebas del backend (persistencia PostgreSQL, auth, CRUD usuarios, salud)
+# 1. Pruebas completas del backend (143 pruebas con Vitest y PostgreSQL)
 npm run test:api
 
-# Pruebas de integración de la app móvil (registro, login, persistencia, perfil, logout, soft-delete)
+# 2. Pruebas de integración de la app móvil (Auth, almacenamiento seguro, perfil, soft-delete)
 npm run test:mobile
+
+# 3. Prueba integral de ciclo completo (Registro -> Publicación -> Chat -> Propuesta -> Logística -> Calificación -> KPIs)
+npm run test:full
+
+# 4. Limpieza destructiva de base de datos (solo desarrollo, requiere confirmación y contraseña por entorno)
+npm run db:clean
 ```
 
 ---
 
-## 8. Inicio del Backend
+## 9. Inicio del Backend
 
 Modo desarrollo con recarga en caliente:
 ```bash
@@ -117,9 +136,9 @@ El servidor estará escuchando en:
 
 ---
 
-## 9. Inicio y Visualización de la Aplicación Móvil (Fase 5)
+## 10. Inicio y Visualización de la Aplicación Móvil
 
-La aplicación móvil de DATA_CIRCULAR está construida con **React Native**, **Expo SDK 57** y **Expo Router**, conectada en vivo con el backend de Bogotá D.C. Puedes ejecutarla de tres maneras:
+La aplicación móvil de DATA_CIRCULAR está construida con **React Native**, **Expo SDK 57** y **Expo Router**, conectada en vivo con el backend con cobertura nacional en Colombia. Puedes ejecutarla de tres maneras:
 
 ### Opción A: En el Navegador Web de tu PC (Recomendada para pruebas rápidas)
 Abre una terminal en VS Code y ejecuta:
@@ -139,29 +158,30 @@ Se abrirá automáticamente en tu navegador predeterminado (o en `http://localho
    ```bash
    npm run dev:mobile
    ```
-5. Escanea el **código QR** generado en la terminal:
-   - En Android: desde la app Expo Go ("Scan QR Code").
-   - En iPhone: desde la app Cámara nativa.
+5. Escanea el **código QR** generado en la terminal.
 
-### Opción C: En Emulador de Android Studio
-Si tienes Android Studio instalado y configurado con un AVD (Android Virtual Device):
+### Opción C: Ejecución Concurrente Todo en Uno
 ```bash
-npm run mobile:android
+npm run dev
 ```
-*(El emulador se comunicará automáticamente con el backend en `http://10.0.2.2:3000/api/v1`)*.
 
 ---
 
-## 10. Documentación Completa del Proyecto
+## 11. Documentación Completa del Proyecto
 
-En la carpeta [`docs/`](./docs) encontrarás:
-- [Arquitectura del Sistema](./docs/arquitectura.md)
-- [Modelo de Datos](./docs/modelo-datos.md)
-- [Especificación de la API REST](./docs/api.md)
-- [Arquitectura de Seguridad](./docs/seguridad.md)
-- [Registro de Decisiones Técnicas (ADR)](./docs/decisiones-tecnicas.md)
-- [Estrategia de Pruebas](./docs/plan-pruebas.md)
-- [Catálogo Exhaustivo de Archivos](./docs/catalogo-archivos.md)
+En la carpeta [`docs/`](./docs) encontrarás la documentación exhaustiva del proyecto:
+- 📖 [**Manual de Usuario Final**](./docs/manual-usuario.md) — *Guía paso a paso para Generadores, Recicladores y Transportadores*.
+- 🛡️ [**Manual del Administrador**](./docs/manual-administrador.md) — *Guía de gobernanza, auditoría, KPIs y gestión de catálogo*.
+- 🧪 [**Guía de Pruebas y Flujo del Proyecto**](./docs/guia-pruebas-y-flujo.md) — *Matriz de pruebas y diagrama de secuencia integral*.
+- 🏛️ [Arquitectura del Sistema](./docs/arquitectura.md)
+- 🗄️ [Modelo de Datos Relacional](./docs/modelo-datos.md)
+- 📡 [Especificación de la API REST](./docs/api.md)
+- 🔒 [Arquitectura de Seguridad y Habeas Data](./docs/seguridad.md)
+- ⚖️ [Registro de Decisiones Técnicas (ADR)](./docs/decisiones-tecnicas.md)
+- 📋 [Estrategia de Pruebas](./docs/plan-pruebas.md)
+- 📁 [Catálogo Exhaustivo de Archivos](./docs/catalogo-archivos.md)
+- 🎨 [Contratos de Interfaz de Usuario (UI)](./docs/ui-contracts.md)
+- 💻 [Guía de Ejecución Local](./docs/ejecucion-local.md)
 
 ---
 

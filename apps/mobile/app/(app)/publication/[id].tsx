@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -8,39 +8,47 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import {
   MaterialPublicationDto,
   PublicationMatchDto,
+  LEGAL_CONTENT_ES,
 } from '@data-circular/shared';
 import { Tokens } from '../../../src/theme/tokens';
 import { BrandHeader } from '../../../src/components/BrandHeader';
 import { MatchCard } from '../../../src/components/MatchCard';
 import { ErrorBanner } from '../../../src/components/ErrorBanner';
 import { getCategoryIcon } from '../../../src/components/CategoryChip';
+import { VerifiedUserBadge } from '../../../src/components/VerifiedUserBadge';
+import { VerificationRequestModal } from '../../../src/components/VerificationRequestModal';
+import { VerificationCertificateModal } from '../../../src/components/VerificationCertificateModal';
 import { PublicationsApi } from '../../../src/api/publications.api';
 import { MatchesApi } from '../../../src/api/matches.api';
 import { ConversationsApi } from '../../../src/api/conversations.api';
 import { useAuth } from '../../../src/context/AuthContext';
+import { navigateBackOrFallback } from '../../../src/navigation';
 
 export default function PublicationDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { user: currentUser } = useAuth();
+  const handleBack = () =>
+    navigateBackOrFallback(
+      () => router.canGoBack(),
+      () => router.back(),
+      () => router.replace('/(app)')
+    );
 
   const [publication, setPublication] = useState<MaterialPublicationDto | null>(null);
   const [matches, setMatches] = useState<PublicationMatchDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [contacting, setContacting] = useState(false);
+  const [updatingTransport, setUpdatingTransport] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [verificationModalVisible, setVerificationModalVisible] = useState(false);
+  const [certificateModalVisible, setCertificateModalVisible] = useState(false);
 
-  useEffect(() => {
-    if (id) {
-      loadPublicationAndMatches(id);
-    }
-  }, [id]);
-
-  const loadPublicationAndMatches = async (pubId: string) => {
+  const loadPublicationAndMatches = useCallback(async (pubId: string) => {
     setLoading(true);
     setErrorMessage(null);
     try {
@@ -55,7 +63,13 @@ export default function PublicationDetailScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (id) void loadPublicationAndMatches(id);
+    }, [id, loadPublicationAndMatches])
+  );
 
   if (loading) {
     return (
@@ -69,14 +83,14 @@ export default function PublicationDetailScreen() {
   if (!publication) {
     return (
       <View style={styles.screen}>
-        <BrandHeader title="Detalle de Publicación" showBack={true} onBack={() => router.back()} />
+        <BrandHeader title="Detalle de Publicación" showBack={true} onBack={handleBack} />
         <View style={styles.errorContainer}>
           <Text style={styles.errorIcon}>⚠️</Text>
           <Text style={styles.errorTitle}>Publicación no encontrada</Text>
           <Text style={styles.errorSubtitle}>
             Es posible que el material haya sido retirado o completado.
           </Text>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <TouchableOpacity style={styles.backButton} onPress={handleBack}>
             <Text style={styles.backButtonText}>Regresar</Text>
           </TouchableOpacity>
         </View>
@@ -88,10 +102,29 @@ export default function PublicationDetailScreen() {
   const categoryName = publication.category?.name || 'Material Aprovechable';
   const parentCategory = publication.category?.parent?.name;
   const unitAbbr = publication.unit?.abbreviation || 'und';
-  const locality = publication.locationArea || 'Bogotá D.C.';
+  const locality = publication.locationArea || publication.locationCity || 'Colombia';
   const publisherName = publication.ownerUser?.fullName || 'Usuario de la Red';
   const orgName = publication.organization?.name;
   const isOwnPublication = currentUser?.id === publication.ownerUserId;
+  const canEditPublication = isOwnPublication && currentUser?.role === 'USER';
+  const canManageTransport =
+    currentUser?.role === 'USER' &&
+    publication.isMatchParticipant === true;
+
+  const handleTransportToggle = async () => {
+    setUpdatingTransport(true);
+    setErrorMessage(null);
+    try {
+      const updated = await PublicationsApi.update(publication.id, {
+        requiresTransport: !publication.requiresTransport,
+      });
+      setPublication(updated);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'No se pudo actualizar la solicitud de transporte.');
+    } finally {
+      setUpdatingTransport(false);
+    }
+  };
 
   const handleContact = async () => {
     if (!publication) return;
@@ -118,7 +151,7 @@ export default function PublicationDetailScreen() {
         title={categoryName}
         subtitle={`${isOffer ? 'Oferta de Material' : 'Demanda Requerida'} • DATA_CIRCULAR`}
         showBack={true}
-        onBack={() => router.back()}
+        onBack={handleBack}
         curved={true}
       />
 
@@ -167,6 +200,52 @@ export default function PublicationDetailScreen() {
             </View>
           </View>
 
+          {publication.requiresTransport ? (
+            <View style={styles.transportNotice}>
+              <Text style={styles.transportNoticeText}>
+                🚛 Las partes de esta coincidencia solicitan transporte para este material.
+              </Text>
+            </View>
+          ) : null}
+          {canManageTransport ? (
+            <TouchableOpacity
+              style={styles.transportToggle}
+              onPress={handleTransportToggle}
+              disabled={updatingTransport}
+              accessibilityRole="checkbox"
+              accessibilityState={{
+                checked: publication.requiresTransport,
+                disabled: updatingTransport,
+              }}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={styles.transportToggleTitle}>
+                  {publication.requiresTransport ? '🚛 Transporte solicitado' : '🚛 Solicitar transporte'}
+                </Text>
+                <Text style={styles.transportToggleSubtitle}>
+                  Disponible para ambas partes después de una coincidencia.
+                </Text>
+              </View>
+              <View
+                style={[
+                  styles.transportCheckbox,
+                  publication.requiresTransport && styles.transportCheckboxSelected,
+                ]}
+              >
+                {publication.requiresTransport ? (
+                  <Text style={styles.transportCheckmark}>✓</Text>
+                ) : null}
+              </View>
+            </TouchableOpacity>
+          ) : null}
+
+          {publication.description ? (
+            <View style={styles.descriptionSection}>
+              <Text style={styles.descriptionLabel}>Descripción del Material</Text>
+              <Text style={styles.descriptionText}>{publication.description}</Text>
+            </View>
+          ) : null}
+
           {/* Cuadrícula de Métricas */}
           <View style={styles.metricsGrid}>
             <View style={styles.metricBox}>
@@ -183,11 +262,11 @@ export default function PublicationDetailScreen() {
             </View>
           </View>
 
-          {/* Ubicación distrital */}
+          {/* Ubicación territorial */}
           <View style={styles.detailRow}>
             <Text style={styles.detailIcon}>📍</Text>
             <View style={styles.detailTexts}>
-              <Text style={styles.detailMain}>{locality} (Bogotá D.C.)</Text>
+              <Text style={styles.detailMain}>{locality}</Text>
               <Text style={styles.detailSub}>{publication.locationAddress}</Text>
             </View>
           </View>
@@ -196,19 +275,36 @@ export default function PublicationDetailScreen() {
           <View style={styles.detailRow}>
             <Text style={styles.detailIcon}>🏢</Text>
             <View style={styles.detailTexts}>
-              <Text style={styles.detailMain}>
-                {orgName ? `${orgName} (${publisherName})` : publisherName}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                <Text style={styles.detailMain}>
+                  {orgName ? `${orgName} (${publisherName})` : publisherName}
+                </Text>
+                {/* Distintivo Usuario Verificado (Bloque C1 - Punto 4) */}
+                <VerifiedUserBadge
+                  verifiedDate={publication.createdAt}
+                  onPressCertificate={() => setCertificateModalVisible(true)}
+                />
+              </View>
               <Text style={styles.detailSub}>
-                Actor verificado en el Sistema Distrital de Economía Circular
+                Participante activo en la red nacional DATA_CIRCULAR
               </Text>
             </View>
           </View>
 
           {/* Botón de Contacto / Negociación */}
           {isOwnPublication ? (
-            <View style={styles.ownPubBanner}>
-              <Text style={styles.ownPubText}>📌 Esta publicación fue creada por ti</Text>
+            <View>
+              <View style={styles.ownPubBanner}>
+                <Text style={styles.ownPubText}>📌 Esta publicación fue creada por ti</Text>
+              </View>
+              {canEditPublication ? (
+                <TouchableOpacity
+                  style={styles.editPublicationButton}
+                  onPress={() => router.push(`/(app)/edit-publication/${publication.id}` as any)}
+                >
+                  <Text style={styles.editPublicationButtonText}>✏️ Editar publicación</Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
           ) : (
             <TouchableOpacity
@@ -224,6 +320,33 @@ export default function PublicationDetailScreen() {
               )}
             </TouchableOpacity>
           )}
+
+          {/* AVISO LEGAL EN OFERTAS — versión completa (Bloque C1 - Punto 1) */}
+          <View style={styles.legalNoticeCard}>
+            <View style={styles.legalNoticeHeader}>
+              <Text style={styles.legalNoticeIcon}>⚖️</Text>
+              <Text style={styles.legalNoticeTitle}>
+                {LEGAL_CONTENT_ES.avisoLegalOfertasCompleto.titulo}
+              </Text>
+            </View>
+            <Text style={styles.legalNoticeText}>
+              {LEGAL_CONTENT_ES.avisoLegalOfertasCompleto.texto}
+            </Text>
+            <View style={styles.legalNoticeMeta}>
+              <Text style={styles.legalNoticeMetaText}>
+                Versión {LEGAL_CONTENT_ES.avisoLegalOfertasCompleto.version} • {LEGAL_CONTENT_ES.avisoLegalOfertasCompleto.estado}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.legalNoticeBtn}
+              onPress={() => setVerificationModalVisible(true)}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.legalNoticeBtnText}>
+                🛡️ {LEGAL_CONTENT_ES.avisoLegalOfertasCompleto.boton}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Sección de Coincidencias Inteligentes (Fase 9 / HU-08) */}
@@ -234,8 +357,8 @@ export default function PublicationDetailScreen() {
             </Text>
             <Text style={styles.matchesSub}>
               {isOffer
-                ? 'Compradores y transformadores que requieren este material'
-                : 'Generadores que tienen disponible este material'}
+                ? 'Perfiles recolectores con una demanda compatible para este material'
+                : 'Generadores con una oferta compatible para esta necesidad'}
             </Text>
           </View>
 
@@ -260,6 +383,30 @@ export default function PublicationDetailScreen() {
 
         <View style={{ height: 30 }} />
       </ScrollView>
+
+      {/* Modal de Solicitud de Verificación (Bloque C1 y C2 - Punto 3) */}
+      <VerificationRequestModal
+        visible={verificationModalVisible}
+        onClose={() => setVerificationModalVisible(false)}
+        targetUser={publication.ownerUser}
+        targetOrganization={publication.organization}
+        defaultType="OTHER"
+      />
+
+      {/* Modal de Constancia Documental (Bloque C1 - Puntos 5 y 6) */}
+      <VerificationCertificateModal
+        visible={certificateModalVisible}
+        onClose={() => setCertificateModalVisible(false)}
+        certificate={{
+          code: `DC-${publication.id.substring(0, 8).toUpperCase()}`,
+          subjectName: orgName || publisherName,
+          date: new Date(publication.createdAt).toLocaleDateString('es-CO'),
+          scope: 'Aprovechamiento y trazabilidad de materiales recuperables a nivel nacional.',
+          validity: '31 de diciembre de 2027',
+          isDraft: true,
+          publicUrl: `https://datacircular.imara.org/verify/DC-${publication.id.substring(0, 8).toUpperCase()}`,
+        }}
+      />
     </View>
   );
 }
@@ -371,6 +518,68 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: Tokens.colors.textDark,
   },
+  descriptionSection: {
+    marginBottom: 8,
+  },
+  descriptionLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Tokens.colors.textMuted,
+    marginBottom: 3,
+  },
+  descriptionText: {
+    fontSize: 14,
+    color: Tokens.colors.textDark,
+    lineHeight: 20,
+  },
+  transportNotice: {
+    backgroundColor: '#F0F7FB',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 8,
+  },
+  transportNoticeText: {
+    color: '#0F548C',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  transportToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0F9FF',
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 10,
+  },
+  transportToggleTitle: {
+    fontSize: 13,
+    color: '#075985',
+    fontWeight: '700',
+  },
+  transportToggleSubtitle: {
+    fontSize: 11,
+    color: '#0369A1',
+    marginTop: 3,
+  },
+  transportCheckbox: {
+    width: 23,
+    height: 23,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: '#0284C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 12,
+  },
+  transportCheckboxSelected: {
+    backgroundColor: '#0284C7',
+  },
+  transportCheckmark: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+  },
   statusPill: {
     backgroundColor: '#EAF8EE',
     paddingHorizontal: 8,
@@ -457,6 +666,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
+  editPublicationButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+    marginTop: 8,
+    borderRadius: 10,
+    backgroundColor: Tokens.colors.primary,
+  },
+  editPublicationButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
   matchesSection: {
     marginTop: 20,
   },
@@ -516,5 +738,59 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',
+  },
+  legalNoticeCard: {
+    backgroundColor: Tokens.colors.brand.orangeTint,
+    borderWidth: 1,
+    borderColor: '#CBE0D3',
+    borderRadius: Tokens.radii.card,
+    padding: Tokens.spacing.md,
+    marginTop: Tokens.spacing.lg,
+  },
+  legalNoticeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  legalNoticeIcon: {
+    fontSize: 18,
+    marginRight: 6,
+  },
+  legalNoticeTitle: {
+    fontSize: 13.5,
+    fontWeight: '800',
+    color: Tokens.colors.textPrimary,
+  },
+  legalNoticeText: {
+    fontSize: 11.5,
+    lineHeight: 17,
+    color: '#263D30',
+    textAlign: 'justify',
+  },
+  legalNoticeMeta: {
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: Tokens.radii.xs,
+    alignSelf: 'flex-start',
+    marginVertical: 8,
+  },
+  legalNoticeMetaText: {
+    fontSize: 9.5,
+    color: Tokens.colors.textPrimary,
+    fontWeight: '600',
+  },
+  legalNoticeBtn: {
+    backgroundColor: Tokens.colors.brand.orangeStrong,
+    borderRadius: Tokens.radii.pill,
+    paddingVertical: 9,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  legalNoticeBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 12,
   },
 });

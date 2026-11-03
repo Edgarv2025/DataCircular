@@ -77,7 +77,7 @@ export async function apiFetch<T>(
 
     if (isNetworkError) {
       throw new ApiError(
-        `No se pudo conectar con el servidor backend DATA_CIRCULAR (${Config.apiUrl}). Por favor verifica que el servidor esté encendido y que tu conexión a la red de Bogotá esté activa.`,
+        `No se pudo conectar con el servidor backend DATA_CIRCULAR (${Config.apiUrl}). Por favor verifica que el servidor esté encendido y que tu conexión a Internet o red esté activa.`,
         0
       );
     }

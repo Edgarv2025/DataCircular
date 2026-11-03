@@ -10,6 +10,8 @@ import {
 import { MaterialPublicationDto } from '@data-circular/shared';
 import { Tokens } from '../theme/tokens';
 import { getCategoryIcon } from './CategoryChip';
+import { CompactLegalNotice } from './CompactLegalNotice';
+import { VerifiedUserBadge } from './VerifiedUserBadge';
 
 interface MaterialCardProps {
   publication: MaterialPublicationDto;
@@ -20,7 +22,7 @@ interface MaterialCardProps {
 /**
  * Tarjeta de material en cuadrícula de 2 columnas según maqueta (maqueta.jpg).
  * Incluye imagen/fallback, badges de tipo y urgencia, título, cantidad/unidad,
- * pin de localidad (Bogotá D.C.) y botón de acción "Ver detalle".
+ * pin de ciudad o municipio y botón de acción "Ver detalle".
  */
 export const MaterialCard: React.FC<MaterialCardProps> = ({
   publication,
@@ -30,7 +32,7 @@ export const MaterialCard: React.FC<MaterialCardProps> = ({
   const isOffer = publication.type === 'OFFER';
   const categoryName = publication.category?.name || 'Material Recuperable';
   const unitAbbr = publication.unit?.abbreviation || 'und';
-  const locality = publication.locationArea || publication.locationCity || 'Bogotá D.C.';
+  const locality = publication.locationArea || publication.locationCity || 'Colombia';
   const hasCompatible = (publication.publicacionesCompatibles || 0) > 0;
 
   return (
@@ -49,7 +51,7 @@ export const MaterialCard: React.FC<MaterialCardProps> = ({
           />
         ) : (
           <View style={styles.fallbackImage}>
-            <Text style={styles.fallbackIcon}>{getCategoryIcon(categoryName)}</Text>
+            <Text style={styles.fallbackText}>{categoryName.substring(0, 3).toUpperCase()}</Text>
           </View>
         )}
 
@@ -65,12 +67,17 @@ export const MaterialCard: React.FC<MaterialCardProps> = ({
               {isOffer ? 'OFERTA' : 'NECESIDAD'}
             </Text>
           </View>
+          {isOffer && publication.status === 'ACTIVE' ? (
+            <View style={styles.availableBadge}>
+              <Text style={styles.availableBadgeText}>Disponible hoy</Text>
+            </View>
+          ) : null}
         </View>
 
         {publication.isUrgent ? (
           <View style={styles.badgeTopRight}>
             <View style={styles.urgentBadge}>
-              <Text style={styles.urgentBadgeText}>⚡ Urgente</Text>
+              <Text style={styles.urgentBadgeText}>Urgente</Text>
             </View>
           </View>
         ) : null}
@@ -81,6 +88,14 @@ export const MaterialCard: React.FC<MaterialCardProps> = ({
         <Text style={styles.title} numberOfLines={1}>
           {categoryName}
         </Text>
+        {publication.description ? (
+          <Text style={styles.description} numberOfLines={2}>
+            {publication.description}
+          </Text>
+        ) : null}
+        {publication.requiresTransport ? (
+          <Text style={styles.transportNotice}>Requiere transporte</Text>
+        ) : null}
 
         {/* Cantidad y Unidad */}
         <View style={styles.quantityRow}>
@@ -96,7 +111,6 @@ export const MaterialCard: React.FC<MaterialCardProps> = ({
 
         {/* Ubicación distrital */}
         <View style={styles.locationRow}>
-          <Text style={styles.pinIcon}>📍</Text>
           <Text style={styles.locationText} numberOfLines={1}>
             {locality}
           </Text>
@@ -106,10 +120,13 @@ export const MaterialCard: React.FC<MaterialCardProps> = ({
         {hasCompatible ? (
           <View style={styles.compatBadge}>
             <Text style={styles.compatText}>
-              🎯 {publication.publicacionesCompatibles} compatibles
+              {publication.publicacionesCompatibles} compatibles
             </Text>
           </View>
         ) : null}
+
+        {/* Aviso Compacto (Bloque C1 - Punto 2) */}
+        <CompactLegalNotice />
 
         {/* Botón Ver Detalle (Pill verde) */}
         <View style={styles.actionButton}>
@@ -149,8 +166,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: Tokens.colors.accentLight,
   },
-  fallbackIcon: {
-    fontSize: 42,
+  fallbackText: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: Tokens.colors.primaryDark,
+    letterSpacing: 1.5,
   },
   badgeTopLeft: {
     position: 'absolute',
@@ -167,6 +187,18 @@ const styles = StyleSheet.create({
   },
   needBadge: {
     backgroundColor: '#0F548C',
+  },
+  availableBadge: {
+    backgroundColor: Tokens.colors.brand.orangeStrong,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: Tokens.radii.pill,
+    marginTop: 4,
+  },
+  availableBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '700',
   },
   typeBadgeText: {
     color: '#FFFFFF',
@@ -199,6 +231,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: Tokens.colors.textDark,
+    marginBottom: 4,
+  },
+  description: {
+    fontSize: 11,
+    lineHeight: 15,
+    color: Tokens.colors.textMuted,
+    marginBottom: 4,
+  },
+  transportNotice: {
+    color: '#0F548C',
+    fontSize: 10,
+    fontWeight: '700',
     marginBottom: 4,
   },
   quantityRow: {

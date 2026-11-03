@@ -18,14 +18,13 @@ export const MatchCard: React.FC<MatchCardProps> = ({ match, onPress, style }) =
   const pub = match.publication;
   const categoryName = pub?.category?.name || 'Material Compatible';
   const unitAbbr = pub?.unit?.abbreviation || 'und';
-  const locality = pub?.locationArea || pub?.locationCity || 'Bogotá D.C.';
+  const locality = pub?.locationArea || pub?.locationCity || 'Colombia';
   const isOffer = pub?.type === 'OFFER';
 
   return (
     <View style={[styles.card, style]}>
       <View style={styles.topRow}>
         <View style={styles.iconAndTitle}>
-          <Text style={styles.categoryIcon}>{getCategoryIcon(categoryName)}</Text>
           <View style={styles.titleColumn}>
             <Text style={styles.title} numberOfLines={1}>
               {categoryName}

@@ -20,7 +20,7 @@ export class PublicationsController {
 
   async getById(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const publication = await publicationsService.getPublicationById(req.params.id);
+      const publication = await publicationsService.getPublicationById(req.params.id, req.user!);
       sendSuccess(res, publication, 'Publicación obtenida exitosamente');
     } catch (err) {
       next(err);

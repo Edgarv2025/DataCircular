@@ -4,6 +4,7 @@ import {
   CreateCategoryInput,
   UpdateCategoryInput,
   CreateUnitInput,
+  UpdateUnitInput,
 } from '@data-circular/shared';
 import { catalogRepository } from './catalog.repository';
 
@@ -19,8 +20,8 @@ export class CatalogError extends Error {
 }
 
 export class CatalogService {
-  async listCategoriesTree(): Promise<MaterialCategoryDto[]> {
-    return catalogRepository.listCategoriesTree();
+  async listCategoriesTree(activeOnly = true): Promise<MaterialCategoryDto[]> {
+    return catalogRepository.listCategoriesTree(activeOnly);
   }
 
   async getCategoryById(id: string): Promise<MaterialCategoryDto> {
@@ -100,8 +101,16 @@ export class CatalogService {
     return catalogRepository.updateCategory(id, input);
   }
 
-  async listUnits(): Promise<UnitDto[]> {
-    return catalogRepository.listUnits();
+  async deleteCategory(id: string): Promise<void> {
+    const current = await catalogRepository.findCategoryById(id);
+    if (!current) {
+      throw new CatalogError('CATEGORY_NOT_FOUND', 'Categoría de material no encontrada', 404);
+    }
+    await catalogRepository.deactivateCategoryTree(id);
+  }
+
+  async listUnits(activeOnly = true): Promise<UnitDto[]> {
+    return catalogRepository.listUnits(activeOnly);
   }
 
   async createUnit(input: CreateUnitInput): Promise<UnitDto> {
@@ -118,6 +127,37 @@ export class CatalogService {
     }
 
     return catalogRepository.createUnit(input);
+  }
+
+  async updateUnit(id: string, input: UpdateUnitInput): Promise<UnitDto> {
+    const current = await catalogRepository.findUnitById(id);
+    if (!current) {
+      throw new CatalogError('UNIT_NOT_FOUND', 'Unidad de medida no encontrada', 404);
+    }
+
+    if (input.name !== undefined || input.abbreviation !== undefined) {
+      const duplicate = await catalogRepository.findUnitByNameOrAbbreviation(
+        input.name || current.name,
+        input.abbreviation || current.abbreviation
+      );
+      if (duplicate && duplicate.id !== id) {
+        throw new CatalogError(
+          'UNIT_ALREADY_EXISTS',
+          'Ya existe una unidad de medida con ese nombre o abreviatura',
+          409
+        );
+      }
+    }
+
+    return catalogRepository.updateUnit(id, input);
+  }
+
+  async deleteUnit(id: string): Promise<UnitDto> {
+    const current = await catalogRepository.findUnitById(id);
+    if (!current) {
+      throw new CatalogError('UNIT_NOT_FOUND', 'Unidad de medida no encontrada', 404);
+    }
+    return catalogRepository.deactivateUnit(id);
   }
 }
 

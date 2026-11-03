@@ -92,7 +92,7 @@ export default function LoginScreen() {
           <View style={styles.introSection}>
             <Text style={styles.welcomeTitle}>Iniciar Sesión</Text>
             <Text style={styles.welcomeSubtitle}>
-              Plataforma Distrital de Economía Circular • Bogotá D.C.
+              Plataforma Nacional de Economía Circular • Colombia
             </Text>
           </View>
 
@@ -223,7 +223,8 @@ const styles = StyleSheet.create({
   },
   welcomeSubtitle: {
     fontSize: 12,
-    color: Tokens.colors.textMuted,
+    color: Tokens.colors.brand.orangeDark,
+    fontWeight: '600',
     textAlign: 'center',
     marginTop: 4,
   },

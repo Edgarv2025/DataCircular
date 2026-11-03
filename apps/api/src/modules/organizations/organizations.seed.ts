@@ -10,6 +10,9 @@ export const SYSTEM_PERMISSIONS = [
   { code: 'members:remove', name: 'Remover Miembros', description: 'Desvincular integrantes de la organización', module: 'members' },
   { code: 'verification:request', name: 'Solicitar Verificación', description: 'Radicar solicitud de certificación institucional ante IMARA/autoridades', module: 'verification' },
   { code: 'verification:review', name: 'Revisar Verificación', description: 'Dictaminar y aprobar/rechazar solicitudes de verificación institucional', module: 'verification' },
+  { code: 'platform:settings', name: 'Parámetros de Plataforma', description: 'Configurar tarifas, parámetros operativos y ajustes del sistema', module: 'settings' },
+  { code: 'certificate:issue', name: 'Emisión de Certificados', description: 'Emitir, firmar y revocar constancias documentales de verificación', module: 'verification' },
+  { code: 'analytics:read', name: 'Lectura de Analítica', description: 'Consultar indicadores nacionales, balance de masa y reportes de impacto', module: 'analytics' },
 ];
 
 export const SYSTEM_ROLES_PERMISSIONS: Record<string, string[]> = {

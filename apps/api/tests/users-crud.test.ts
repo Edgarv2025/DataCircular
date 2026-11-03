@@ -54,6 +54,7 @@ describe('CRUD de Usuarios y Perfil (/api/v1/users)', () => {
         fullName: 'Administrador Sistema',
         email: `admin.${Date.now()}@fundacionimara.org`,
         password: 'AdminPassword123!@#',
+        phone: '+57 310 000 0006',
         userType: 'GENERATOR',
         dataPolicyAccepted: true,
       });
@@ -310,6 +311,7 @@ describe('CRUD de Usuarios y Perfil (/api/v1/users)', () => {
           fullName: 'Usuario Para Desactivar',
           email: `desactivar.${Date.now()}@fundacionimara.org`,
           password: 'Password123!@#',
+          phone: '+57 310 000 0007',
           userType: 'GENERATOR',
           dataPolicyAccepted: true,
         });

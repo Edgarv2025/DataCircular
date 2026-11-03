@@ -20,6 +20,7 @@ import { ErrorBanner } from '../../src/components/ErrorBanner';
 import { LocalityPicker } from '../../src/components/LocalityPicker';
 import { DataPolicyInfoDto, PASSWORD_REGEX, UserType, USER_TYPES } from '@data-circular/shared';
 import { AuthApi } from '../../src/api/auth.api';
+import { navigateBackOrFallback } from '../../src/navigation';
 
 const USER_TYPE_OPTIONS: { value: UserType; label: string; detail: string; icon: string }[] = [
   { value: 'GENERATOR', label: 'Generador', detail: 'Ofrezco materiales', icon: '🏢' },
@@ -31,12 +32,18 @@ const USER_TYPE_OPTIONS: { value: UserType; label: string; detail: string; icon:
 export default function RegisterScreen() {
   const router = useRouter();
   const { register } = useAuth();
+  const handleBack = () =>
+    navigateBackOrFallback(
+      () => router.canGoBack(),
+      () => router.back(),
+      () => router.replace('/(auth)/login')
+    );
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [userType, setUserType] = useState<UserType | null>(null);
-  const [selectedLocality, setSelectedLocality] = useState('Chapinero');
+  const [selectedLocality, setSelectedLocality] = useState('Bogotá D.C.');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [dataPolicyAccepted, setDataPolicyAccepted] = useState(false);
@@ -80,9 +87,9 @@ export default function RegisterScreen() {
       errors.userType = 'Selecciona el tipo de usuario';
     }
 
-    // Localidad
+    // Ciudad o Municipio
     if (!selectedLocality) {
-      errors.locality = 'Por favor selecciona tu localidad en Bogotá';
+      errors.locality = 'Por favor selecciona tu ciudad o municipio';
     }
 
     // Contraseña
@@ -150,9 +157,9 @@ export default function RegisterScreen() {
     <View style={styles.container}>
       <BrandHeader
         title="Crear Nueva Cuenta"
-        subtitle="Registro Distrital Bogotá D.C. • DATA_CIRCULAR"
+        subtitle="Registro Nacional • DATA_CIRCULAR Colombia"
         showBack={true}
-        onBack={() => router.back()}
+        onBack={handleBack}
         curved={true}
       />
 
@@ -168,7 +175,7 @@ export default function RegisterScreen() {
           <View style={styles.topInfo}>
             <Text style={styles.pageTitle}>Registro en DATA_CIRCULAR</Text>
             <Text style={styles.pageSubtitle}>
-              Únete a la red colaborativa de economía circular en Bogotá D.C.
+              Únete a la red colaborativa de economía circular en Colombia.
             </Text>
           </View>
 
@@ -210,7 +217,7 @@ export default function RegisterScreen() {
               placeholder="310 123 4567"
               prefix="+57"
               keyboardType="phone-pad"
-              helperText="Número móvil para coordinación de recolección en Bogotá"
+              helperText="Número móvil para coordinación de recolección en Colombia"
               error={fieldErrors.phone}
             />
 
@@ -243,6 +250,7 @@ export default function RegisterScreen() {
             </View>
 
             <LocalityPicker
+              label="Ciudad o Municipio *"
               selectedLocality={selectedLocality}
               onSelect={(locality) => {
                 setSelectedLocality(locality);
@@ -356,8 +364,8 @@ const styles = StyleSheet.create({
   },
   pageTitle: {
     fontSize: 20,
-    fontWeight: '800',
-    color: Tokens.colors.primaryDark,
+    fontWeight: '700',
+    color: Tokens.colors.brand.orangeStrong,
     marginBottom: 4,
   },
   pageSubtitle: {
@@ -376,8 +384,8 @@ const styles = StyleSheet.create({
   },
   userTypeLabel: {
     fontSize: 13,
-    fontWeight: '700',
-    color: Tokens.colors.textDark,
+    fontWeight: '600',
+    color: Tokens.colors.brand.orangeStrong,
     marginBottom: 8,
   },
   userTypeOptions: {

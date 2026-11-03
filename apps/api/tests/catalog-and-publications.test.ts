@@ -27,9 +27,11 @@ describe('Fase 8 - Catálogo de Materiales y Publicaciones (/api/v1/catalog y /a
   let outsiderId: string;
 
   let testOrgId: string;
+  let recyclerOrgId: string;
 
   let validSubcategoryId: string;
   let parentCategoryId: string;
+  let otherSubcategoryId: string;
   let validUnitId: string;
 
   beforeAll(async () => {
@@ -45,6 +47,7 @@ describe('Fase 8 - Catálogo de Materiales y Publicaciones (/api/v1/catalog y /a
         fullName: 'Admin Catálogo',
         email: `admin.catalog.${Date.now()}@circularbogota.org`,
         password: 'AdminPassword123!@#',
+        phone: '+57 310 000 0001',
         userType: 'TRANSFORMER',
         dataPolicyAccepted: true,
       });
@@ -132,6 +135,19 @@ describe('Fase 8 - Catálogo de Materiales y Publicaciones (/api/v1/catalog y /a
     const plasticos = tree.find((c) => c.name === 'Plásticos');
     parentCategoryId = plasticos!.id;
     validSubcategoryId = plasticos!.subcategories![0].id;
+    otherSubcategoryId = tree.find((c) => c.name === 'Metales')!.subcategories![0].id;
+
+    const recyclerOrgRes = await request(app)
+      .post('/api/v1/organizations')
+      .set('Authorization', `Bearer ${user2Token}`)
+      .send({
+        name: `Recicladora Coincidencias ${Date.now()}`,
+        orgType: 'COOPERATIVE',
+        activityType: 'RECYCLER',
+        materialCategoryIds: [validSubcategoryId],
+      });
+    recyclerOrgId = recyclerOrgRes.body.data.id;
+    createdOrgIds.push(recyclerOrgId);
 
     const units = await catalogRepository.listUnits();
     validUnitId = units.find((u) => u.abbreviation === 'kg')!.id;
@@ -156,7 +172,7 @@ describe('Fase 8 - Catálogo de Materiales y Publicaciones (/api/v1/catalog y /a
   });
 
   describe('1. Catálogo de Materiales y Unidades de Medida', () => {
-    it('1.1 Debe verificar el sembrado completo de categorías (9 categorías principales y 39 subcategorías)', async () => {
+    it('1.1 Debe verificar el catálogo vigente y mantener inactivas las categorías pendientes de decisión jurídica', async () => {
       const res = await request(app)
         .get('/api/v1/catalog/categories')
         .set('Authorization', `Bearer ${user1Token}`);
@@ -166,25 +182,33 @@ describe('Fase 8 - Catálogo de Materiales y Publicaciones (/api/v1/catalog y /a
       expect(Array.isArray(res.body.data)).toBe(true);
 
       const roots = res.body.data;
-      expect(roots.length).toBe(9);
+      expect(roots.length).toBe(11);
 
       const rootNames = roots.map((c: any) => c.name);
       expect(rootNames).toContain('Plásticos');
       expect(rootNames).toContain('Metales');
       expect(rootNames).toContain('Madera');
-      expect(rootNames).toContain('Textiles');
+      expect(rootNames).toContain('Textiles y calzado');
       expect(rootNames).toContain('Orgánicos');
-      expect(rootNames).toContain('RAEE / Electrónicos');
-      expect(rootNames).toContain('Escombros / RCD');
+      expect(rootNames).toContain('Electrónicos y posconsumo');
+      expect(rootNames).toContain('Escombros y residuos de construcción');
       expect(rootNames).toContain('Papel y cartón');
       expect(rootNames).toContain('Vidrio');
+      expect(rootNames).toContain('Muebles y enseres para reutilizar');
+      expect(rootNames).toContain('Residuos peligrosos');
 
-      // Verificar total de subcategorías
       const totalSubcategories = roots.reduce(
         (acc: number, c: any) => acc + (c.subcategories?.length || 0),
         0
       );
-      expect(totalSubcategories).toBe(39);
+      expect(totalSubcategories).toBe(75);
+
+      const allCategories = await catalogRepository.listCategoriesTree(false);
+      const hazardous = allCategories.find((category) => category.name === 'Residuos peligrosos');
+      expect(hazardous?.subcategories).toEqual(expect.arrayContaining([
+        expect.objectContaining({ name: 'Residuos hospitalarios', active: false }),
+        expect.objectContaining({ name: 'Equipos con PCB', active: false }),
+      ]));
     });
 
     it('1.2 Debe consultar las unidades de medida mínimas sembradas (kg, ton, und, l, m3, bulto)', async () => {
@@ -260,11 +284,61 @@ describe('Fase 8 - Catálogo de Materiales y Publicaciones (/api/v1/catalog y /a
       expect(res.body.success).toBe(false);
       expect(res.body.error.code).toBe('PARENT_CATEGORY_NOT_FOUND');
     });
+
+    it('1.6 El administrador puede editar y eliminar categorías y unidades sin borrar su historial', async () => {
+      const suffix = Date.now();
+      const category = await request(app)
+        .post('/api/v1/catalog/categories')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ name: `Material temporal ${suffix}` });
+      expect(category.status).toBe(201);
+      const categoryId = category.body.data.id;
+      createdCategoryIds.push(categoryId);
+
+      const updatedCategory = await request(app)
+        .patch(`/api/v1/catalog/categories/${categoryId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ name: `Material editado ${suffix}` });
+      expect(updatedCategory.status).toBe(200);
+      expect(updatedCategory.body.data.name).toBe(`Material editado ${suffix}`);
+
+      const deletedCategory = await request(app)
+        .delete(`/api/v1/catalog/categories/${categoryId}`)
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(deletedCategory.status).toBe(200);
+      expect(deletedCategory.body.data.active).toBe(false);
+
+      const adminCategories = await request(app)
+        .get('/api/v1/catalog/categories?includeInactive=true')
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(adminCategories.body.data.find((item: any) => item.id === categoryId).active).toBe(false);
+
+      const unit = await request(app)
+        .post('/api/v1/catalog/units')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ name: `Unidad temporal ${suffix}`, abbreviation: `u${suffix}`.slice(0, 10) });
+      expect(unit.status).toBe(201);
+      const unitId = unit.body.data.id;
+      createdUnitIds.push(unitId);
+
+      const updatedUnit = await request(app)
+        .patch(`/api/v1/catalog/units/${unitId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ name: `Unidad editada ${suffix}` });
+      expect(updatedUnit.status).toBe(200);
+      expect(updatedUnit.body.data.name).toBe(`Unidad editada ${suffix}`);
+
+      const deletedUnit = await request(app)
+        .delete(`/api/v1/catalog/units/${unitId}`)
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(deletedUnit.status).toBe(200);
+      expect(deletedUnit.body.data.active).toBe(false);
+    });
   });
 
   describe('2. Publicaciones de Oferta y Necesidad (MaterialPublication)', () => {
     let personalOfferId: string;
-    let corporateNeedId: string;
+    let transportOfferId: string;
 
     it('2.1 Debe rechazar crear publicación directamente sobre una categoría principal (400 Bad Request)', async () => {
       const res = await request(app)
@@ -297,6 +371,7 @@ describe('Fase 8 - Catálogo de Materiales y Publicaciones (/api/v1/catalog y /a
           locationAddress: 'Calle 100 # 19-61',
           locationCity: 'Bogotá D.C.',
           locationArea: 'Usaquén',
+          description: 'Botellas PET transparentes posconsumo, separadas por color.',
           condition: 'limpio y clasificado',
           isUrgent: true,
         });
@@ -307,6 +382,7 @@ describe('Fase 8 - Catálogo de Materiales y Publicaciones (/api/v1/catalog y /a
       expect(res.body.data.ownerUserId).toBe(user1Id);
       expect(res.body.data.organizationId).toBeNull();
       expect(res.body.data.quantity).toBe(250.5);
+      expect(res.body.data.description).toBe('Botellas PET transparentes posconsumo, separadas por color.');
       expect(res.body.data.isUrgent).toBe(true);
       expect(res.body.data.status).toBe('ACTIVE');
 
@@ -314,10 +390,10 @@ describe('Fase 8 - Catálogo de Materiales y Publicaciones (/api/v1/catalog y /a
       createdPublicationIds.push(personalOfferId);
     });
 
-    it('2.3 Debe crear exitosamente una publicación corporativa de necesidad', async () => {
+    it('2.3 Las publicaciones de necesidad están deshabilitadas para todos los perfiles', async () => {
       const res = await request(app)
         .post('/api/v1/publications')
-        .set('Authorization', `Bearer ${user1Token}`)
+        .set('Authorization', `Bearer ${user2Token}`)
         .send({
           type: 'NEED',
           organizationId: testOrgId,
@@ -330,14 +406,153 @@ describe('Fase 8 - Catálogo de Materiales y Publicaciones (/api/v1/catalog y /a
           condition: 'posindustrial',
         });
 
-      expect(res.status).toBe(201);
-      expect(res.body.success).toBe(true);
-      expect(res.body.data.type).toBe('NEED');
-      expect(res.body.data.organizationId).toBe(testOrgId);
-      expect(res.body.data.ownerUserId).toBe(user1Id);
+      expect(res.status).toBe(403);
+      expect(res.body.success).toBe(false);
+    });
 
-      corporateNeedId = res.body.data.id;
-      createdPublicationIds.push(corporateNeedId);
+    it('2.3.1 El generador no puede publicar demandas y el recolector no puede publicar ofertas', async () => {
+      const denied = await request(app)
+        .post('/api/v1/publications')
+        .set('Authorization', `Bearer ${user2Token}`)
+        .send({
+          type: 'OFFER',
+          categoryId: validSubcategoryId,
+          quantity: 20,
+          unitId: validUnitId,
+          locationAddress: 'Calle 10 # 20-30',
+        });
+
+      expect(denied.status).toBe(403);
+
+      const generatorDemand = await request(app)
+        .post('/api/v1/publications')
+        .set('Authorization', `Bearer ${user1Token}`)
+        .send({
+          type: 'NEED',
+          categoryId: validSubcategoryId,
+          quantity: 20,
+          unitId: validUnitId,
+          locationAddress: 'Calle 10 # 20-30',
+        });
+      expect(generatorDemand.status).toBe(403);
+
+      const search = await request(app)
+        .get('/api/v1/publications/search')
+        .set('Authorization', `Bearer ${user1Token}`);
+      expect(search.status).toBe(200);
+      expect(search.body.data.data.every((publication: any) => publication.ownerUserId === user1Id)).toBe(true);
+    });
+
+    it('2.3.1a El administrador no puede publicar ni consultar materiales como participante', async () => {
+      const create = await request(app)
+        .post('/api/v1/publications')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          type: 'OFFER',
+          categoryId: validSubcategoryId,
+          quantity: 20,
+          unitId: validUnitId,
+          locationAddress: 'Calle 10 # 20-30',
+        });
+      expect(create.status).toBe(403);
+
+      const search = await request(app)
+        .get('/api/v1/publications/search')
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(search.status).toBe(403);
+    });
+
+    it('2.3.2 Los perfiles recolectores consultan materiales y solo solicitan transporte tras coincidir', async () => {
+      const created = await request(app)
+        .post('/api/v1/publications')
+        .set('Authorization', `Bearer ${user1Token}`)
+        .send({
+          type: 'OFFER',
+          categoryId: otherSubcategoryId,
+          quantity: 80,
+          unitId: validUnitId,
+          locationAddress: 'Carrera 10 # 20-30',
+        });
+
+      expect(created.status).toBe(201);
+      expect(created.body.data.requiresTransport).toBe(false);
+      transportOfferId = created.body.data.id;
+      createdPublicationIds.push(transportOfferId);
+
+      const prematureRequest = await request(app)
+        .patch(`/api/v1/publications/${transportOfferId}`)
+        .set('Authorization', `Bearer ${outsiderToken}`)
+        .send({ requiresTransport: true });
+      expect(prematureRequest.status).toBe(403);
+
+      const need = await request(app)
+        .post('/api/v1/publications')
+        .set('Authorization', `Bearer ${outsiderToken}`)
+        .send({
+          type: 'NEED',
+          categoryId: validSubcategoryId,
+          quantity: 40,
+          unitId: validUnitId,
+          locationAddress: 'Carrera 10 # 20-31',
+          locationCity: 'Bogotá D.C.',
+          locationArea: 'Fontibón',
+        });
+      expect(need.status).toBe(403);
+
+      const matchingOrganization = await request(app)
+        .post('/api/v1/organizations')
+        .set('Authorization', `Bearer ${user2Token}`)
+        .send({
+          name: `Recicladora Materiales ${Date.now()}`,
+          orgType: 'COOPERATIVE',
+          activityType: 'RECYCLER',
+          materialCategoryIds: [otherSubcategoryId],
+        });
+      expect(matchingOrganization.status).toBe(201);
+      createdOrgIds.push(matchingOrganization.body.data.id);
+
+      const collectorDetail = await request(app)
+        .get(`/api/v1/publications/${transportOfferId}`)
+        .set('Authorization', `Bearer ${user2Token}`);
+      expect(collectorDetail.status).toBe(200);
+      expect(collectorDetail.body.data.isMatchParticipant).toBe(true);
+
+      const suggestions = await request(app)
+        .get('/api/v1/matches/my-suggestions')
+        .set('Authorization', `Bearer ${user2Token}`);
+      expect(suggestions.body.data.map((publication: any) => publication.id)).toContain(transportOfferId);
+
+      const afterMatchRequest = await request(app)
+        .patch(`/api/v1/publications/${transportOfferId}`)
+        .set('Authorization', `Bearer ${user2Token}`)
+        .send({ requiresTransport: true });
+      expect(afterMatchRequest.status).toBe(200);
+      expect(afterMatchRequest.body.data.requiresTransport).toBe(true);
+
+      const generatorRequest = await request(app)
+        .patch(`/api/v1/publications/${transportOfferId}`)
+        .set('Authorization', `Bearer ${user1Token}`)
+        .send({ requiresTransport: false });
+      expect(generatorRequest.status).toBe(200);
+      expect(generatorRequest.body.data.requiresTransport).toBe(false);
+
+      const collectorRequest = await request(app)
+        .patch(`/api/v1/publications/${transportOfferId}`)
+        .set('Authorization', `Bearer ${user2Token}`)
+        .send({ requiresTransport: true });
+      expect(collectorRequest.status).toBe(200);
+      expect(collectorRequest.body.data.requiresTransport).toBe(true);
+
+      const visibleMaterials = await request(app)
+        .get('/api/v1/publications/search?type=OFFER')
+        .set('Authorization', `Bearer ${outsiderToken}`);
+      expect(visibleMaterials.status).toBe(200);
+      expect(visibleMaterials.body.data.data.map((publication: any) => publication.id)).toContain(transportOfferId);
+
+      const accessibleDetail = await request(app)
+        .get(`/api/v1/publications/${personalOfferId}`)
+        .set('Authorization', `Bearer ${outsiderToken}`);
+      expect(accessibleDetail.status).toBe(200);
     });
 
     it('2.4 Debe consultar el detalle de una publicación', async () => {
@@ -358,12 +573,14 @@ describe('Fase 8 - Catálogo de Materiales y Publicaciones (/api/v1/catalog y /a
         .set('Authorization', `Bearer ${user1Token}`)
         .send({
           quantity: 300,
+          description: 'Botellas PET trituradas listas para transformación.',
           condition: 'lavado, triturado y empacado',
         });
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       expect(res.body.data.quantity).toBe(300);
+      expect(res.body.data.description).toBe('Botellas PET trituradas listas para transformación.');
       expect(res.body.data.condition).toBe('lavado, triturado y empacado');
     });
 
@@ -380,17 +597,16 @@ describe('Fase 8 - Catálogo de Materiales y Publicaciones (/api/v1/catalog y /a
       expect(res.body.error.code).toBe('FORBIDDEN');
     });
 
-    it('2.7 Un miembro con rol ADMIN de la organización DEBE poder editar la publicación corporativa', async () => {
+    it('2.7 Un miembro de otra organización no puede modificar la publicación de un generador', async () => {
       const res = await request(app)
-        .patch(`/api/v1/publications/${corporateNeedId}`)
-        .set('Authorization', `Bearer ${user2Token}`)
+        .patch(`/api/v1/publications/${personalOfferId}`)
+        .set('Authorization', `Bearer ${outsiderToken}`)
         .send({
           quantity: 1200,
         });
 
-      expect(res.status).toBe(200);
-      expect(res.body.success).toBe(true);
-      expect(res.body.data.quantity).toBe(1200);
+      expect(res.status).toBe(403);
+      expect(res.body.success).toBe(false);
     });
 
     it('2.8 Debe reflejar como EXPIRED una publicación con expiresAt en el pasado', async () => {
@@ -432,16 +648,20 @@ describe('Fase 8 - Catálogo de Materiales y Publicaciones (/api/v1/catalog y /a
       expect(res.body.data.page).toBe(1);
     });
 
-    it('2.10 Debe listar publicaciones en listado general con paginación simple (sin filtros avanzados)', async () => {
+    it('2.10 Solo ADMIN puede listar publicaciones en listado general', async () => {
       const res = await request(app)
         .get('/api/v1/publications?page=1&limit=10')
         .set('Authorization', `Bearer ${outsiderToken}`);
 
-      expect(res.status).toBe(200);
-      expect(res.body.success).toBe(true);
-      expect(Array.isArray(res.body.data.data)).toBe(true);
-      expect(res.body.data.page).toBe(1);
-      expect(res.body.data.limit).toBe(10);
+      expect(res.status).toBe(403);
+
+      const adminRes = await request(app)
+        .get('/api/v1/publications?page=1&limit=10')
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(adminRes.status).toBe(200);
+      expect(Array.isArray(adminRes.body.data.data)).toBe(true);
+      expect(adminRes.body.data.page).toBe(1);
+      expect(adminRes.body.data.limit).toBe(10);
     });
 
     it('2.11 Debe cerrar o eliminar lógicamente una publicación', async () => {

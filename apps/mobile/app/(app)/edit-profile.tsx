@@ -15,10 +15,17 @@ import { Input } from '../../src/components/Input';
 import { Button } from '../../src/components/Button';
 import { Card } from '../../src/components/Card';
 import { ErrorBanner } from '../../src/components/ErrorBanner';
+import { navigateBackOrFallback } from '../../src/navigation';
 
 export default function EditProfileScreen() {
   const router = useRouter();
   const { user, updateProfile } = useAuth();
+  const handleBack = () =>
+    navigateBackOrFallback(
+      () => router.canGoBack(),
+      () => router.back(),
+      () => router.replace('/(app)/profile')
+    );
 
   const [fullName, setFullName] = useState(user?.fullName || '');
   const [phone, setPhone] = useState(user?.phone || '');
@@ -71,7 +78,7 @@ export default function EditProfileScreen() {
       if (result.success) {
         setSuccessMessage('¡Perfil actualizado exitosamente en DATA_CIRCULAR!');
         setTimeout(() => {
-          router.back();
+          handleBack();
         }, 1200);
       } else {
         setErrorMessage(result.error || 'No se pudo actualizar el perfil.');
@@ -89,7 +96,7 @@ export default function EditProfileScreen() {
         title="Editar Perfil"
         subtitle="Actualización de Datos • DATA_CIRCULAR"
         showBack={true}
-        onBack={() => router.back()}
+        onBack={handleBack}
         curved={true}
       />
 
@@ -103,7 +110,7 @@ export default function EditProfileScreen() {
         >
           <Text style={styles.headerTitle}>Actualizar Datos Personales</Text>
           <Text style={styles.headerSubtitle}>
-            Modifica tu información registrada en la red de Bogotá D.C.
+            Modifica tu información registrada en la red nacional de Colombia.
           </Text>
 
           <ErrorBanner message={errorMessage} type="error" />
@@ -132,7 +139,7 @@ export default function EditProfileScreen() {
               placeholder="310 123 4567"
               prefix="+57"
               keyboardType="phone-pad"
-              helperText="Número para coordinar recolecciones o entregas en Bogotá"
+              helperText="Número para coordinar recolecciones o entregas"
               error={fieldErrors.phone}
             />
 
@@ -146,8 +153,8 @@ export default function EditProfileScreen() {
             />
 
             <Input
-              label="Tipo de Usuario en el Ecosistema"
-              value={user?.userType || 'N/D'}
+              label={user?.role === 'ADMIN' ? 'Perfil de acceso' : 'Tipo de Usuario en el Ecosistema'}
+              value={user?.role === 'ADMIN' ? 'Administrador' : user?.userType || 'N/D'}
               onChangeText={() => {}}
               editable={false}
             />
@@ -155,7 +162,7 @@ export default function EditProfileScreen() {
             <View style={styles.buttonsRow}>
               <Button
                 title="Cancelar"
-                onPress={() => router.back()}
+                onPress={handleBack}
                 variant="outline"
                 style={{ flex: 1, marginRight: 8 }}
               />

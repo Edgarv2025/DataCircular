@@ -2,7 +2,6 @@ import { prisma } from '../../database/prisma';
 import {
   MaterialPublicationDto,
   PublicationMatchDto,
-  MySuggestionsItemDto,
   SafeUserDto,
 } from '@data-circular/shared';
 import { toPublicationDto } from '../publications/publications.repository';
@@ -52,7 +51,7 @@ export class MatchesService {
       factors.push('Misma categoría principal de material');
     }
 
-    // Factor 2: Ubicación geográfica (Ciudad o Localidad)
+    // Factor 2: Ubicación geográfica (Ciudad o Municipio)
     const targetCity = target.locationCity?.trim().toLowerCase();
     const candidateCity = candidate.locationCity?.trim().toLowerCase();
     const targetArea = target.locationArea?.trim().toLowerCase();
@@ -64,9 +63,9 @@ export class MatchesService {
     if (sameCity || sameArea) {
       score += SCORE_WEIGHTS.SAME_LOCATION;
       if (sameArea) {
-        factors.push('Misma localidad o zona geográfica');
+        factors.push('Misma ciudad, municipio o zona geográfica');
       } else {
-        factors.push('Misma ciudad');
+        factors.push('Misma ciudad o municipio');
       }
     }
 
@@ -129,6 +128,7 @@ export class MatchesService {
     const candidates = await prisma.materialPublication.findMany({
       where: {
         type: oppositeType,
+        ownerUser: { role: 'USER' },
         status: 'ACTIVE',
         deletedAt: null,
         id: { not: target.id },
@@ -190,6 +190,8 @@ export class MatchesService {
       return [];
     }
 
+    if (target.type === 'OFFER') return [];
+
     const candidates = await this.getCandidatePool(target);
 
     const matches: PublicationMatchDto[] = [];
@@ -230,71 +232,93 @@ export class MatchesService {
    * Conteo liviano de coincidencias potenciales para el detalle de publicación (RF-10, CU-06).
    */
   async countMatchesForPublication(publicationId: string): Promise<number> {
-    try {
-      const matches = await this.getMatchesForPublication(publicationId);
-      return matches.length;
-    } catch {
-      return 0;
-    }
+    const publication = await prisma.materialPublication.findFirst({
+      where: { id: publicationId, type: 'OFFER', status: 'ACTIVE', deletedAt: null },
+      select: { ownerUserId: true },
+    });
+    if (!publication) return 0;
+    return (
+      await this.findMatchingOrganizationIds(publicationId, { not: publication.ownerUserId })
+    ).length;
+  }
+
+  private async findMatchingOrganizationIds(
+    publicationId: string,
+    memberUserId: string | { not: string }
+  ): Promise<string[]> {
+    const publication = await prisma.materialPublication.findFirst({
+      where: { id: publicationId, type: 'OFFER', status: 'ACTIVE', deletedAt: null },
+      select: { organizationId: true, categoryId: true },
+    });
+    if (!publication) return [];
+
+    const organizationMatches = await prisma.organizationMaterialCategory.findMany({
+      where: {
+        categoryId: publication.categoryId,
+        organization: {
+          ...(publication.organizationId ? { id: { not: publication.organizationId } } : {}),
+          activityType: { in: ['RECYCLER', 'TRANSPORTER', 'TRANSFORMER'] },
+          status: 'ACTIVE',
+          deletedAt: null,
+          members: { some: { userId: memberUserId, status: 'ACTIVE' } },
+        },
+      },
+      select: { organizationId: true },
+      distinct: ['organizationId'],
+    });
+    return organizationMatches.map(({ organizationId }) => organizationId);
+  }
+
+  async isMatchParticipantForPublication(publicationId: string, userId: string): Promise<boolean> {
+    const publication = await prisma.materialPublication.findFirst({
+      where: { id: publicationId, type: 'OFFER', status: 'ACTIVE', deletedAt: null },
+      select: { ownerUserId: true },
+    });
+    if (!publication) return false;
+    const memberUserId = publication.ownerUserId === userId ? { not: userId } : userId;
+    return (await this.findMatchingOrganizationIds(publicationId, memberUserId)).length > 0;
   }
 
   /**
-   * Genera el resumen agregado de coincidencias para el usuario autenticado (GET /matches/my-suggestions).
-   * Retorna las mejores 5 coincidencias para cada publicación activa propia o de sus organizaciones.
+   * Devuelve ofertas activas de materiales seleccionados por la organización del usuario.
    */
-  async getMySuggestions(user: SafeUserDto): Promise<MySuggestionsItemDto[]> {
-    // 1. Obtener IDs de organizaciones activas a las que pertenece el usuario
-    const memberships = await prisma.organizationMember.findMany({
-      where: { userId: user.id, status: 'ACTIVE' },
-      select: { organizationId: true },
+  async getMySuggestions(user: SafeUserDto): Promise<MaterialPublicationDto[]> {
+    const selectedCategories = await prisma.organizationMaterialCategory.findMany({
+      where: {
+        category: { active: true },
+        organization: {
+          status: 'ACTIVE',
+          deletedAt: null,
+          activityType: { in: ['RECYCLER', 'TRANSPORTER', 'TRANSFORMER'] },
+          members: { some: { userId: user.id, status: 'ACTIVE' } },
+        },
+      },
+      select: { categoryId: true },
     });
-    const orgIds = memberships.map((m) => m.organizationId);
+    const categoryIds = [...new Set(selectedCategories.map(({ categoryId }) => categoryId))];
+    if (categoryIds.length === 0) return [];
 
     const now = new Date();
-
-    // 2. Obtener todas las publicaciones activas del usuario o sus organizaciones
-    const myPubsRaw = await prisma.materialPublication.findMany({
+    const offers = await prisma.materialPublication.findMany({
       where: {
-        OR: [
-          { ownerUserId: user.id },
-          ...(orgIds.length > 0 ? [{ organizationId: { in: orgIds } }] : []),
-        ],
+        type: 'OFFER',
+        categoryId: { in: categoryIds },
+        ownerUser: { role: 'USER', userType: 'GENERATOR' },
         status: 'ACTIVE',
         deletedAt: null,
-        AND: [
-          {
-            OR: [
-              { expiresAt: null },
-              { expiresAt: { gt: now } },
-            ],
-          },
-        ],
+        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
       },
       include: {
         ownerUser: true,
         organization: true,
-        category: {
-          include: { parent: true },
-        },
+        category: { include: { parent: true } },
         unit: true,
       },
       orderBy: { createdAt: 'desc' },
+      take: 50,
     });
 
-    const myPubs = myPubsRaw.map(toPublicationDto);
-    const results: MySuggestionsItemDto[] = [];
-
-    // 3. Para cada publicación activa, calcular sus mejores coincidencias (top 5)
-    for (const pub of myPubs) {
-      const matches = await this.getMatchesForPublication(pub.id);
-      results.push({
-        publicationId: pub.id,
-        publication: pub,
-        matches: matches.slice(0, 5),
-      });
-    }
-
-    return results;
+    return offers.map(toPublicationDto);
   }
 }
 

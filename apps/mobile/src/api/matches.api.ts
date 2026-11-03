@@ -1,5 +1,5 @@
 import { apiFetch } from './client';
-import { PublicationMatchDto, MySuggestionsItemDto } from '@data-circular/shared';
+import { MaterialPublicationDto, PublicationMatchDto } from '@data-circular/shared';
 
 /**
  * Cliente API para Motor de Coincidencias y Sugerencias (Fase 9)
@@ -14,9 +14,9 @@ export const MatchesApi = {
   },
 
   /**
-   * Obtiene la bandeja de sugerencias (top 5 coincidencias para cada publicación activa del usuario).
+   * Obtiene las ofertas que coinciden con los materiales de las organizaciones del usuario.
    */
-  async getMySuggestions(): Promise<MySuggestionsItemDto[]> {
-    return apiFetch<MySuggestionsItemDto[]>('/matches/my-suggestions');
+  async getMySuggestions(): Promise<MaterialPublicationDto[]> {
+    return apiFetch<MaterialPublicationDto[]>('/matches/my-suggestions');
   },
 };

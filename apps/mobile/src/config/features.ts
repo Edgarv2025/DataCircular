@@ -7,6 +7,6 @@
 export const FeatureFlags = {
   USE_MOCKS_CHAT: false,
   USE_MOCKS_PROPOSALS: false,
-  USE_MOCKS_OPERATIONS: true,
-  USE_MOCKS_ADMIN_MODERATION: true,
+  USE_MOCKS_OPERATIONS: false,
+  USE_MOCKS_ADMIN_MODERATION: false,
 };

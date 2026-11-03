@@ -52,6 +52,7 @@ describe('Módulo de Autenticación API (/api/v1/auth)', () => {
       // Verificaciones del usuario retornado
       expect(user.fullName).toBe(validTestUser.fullName);
       expect(user.email).toBe(validTestUser.email.toLowerCase());
+      expect(user.phone).toBe(validTestUser.phone);
       expect(user.role).toBe('USER');
       expect(user.userType).toBe(validTestUser.userType);
       expect(user.status).toBe('ACTIVE');
@@ -156,6 +157,7 @@ describe('Módulo de Autenticación API (/api/v1/auth)', () => {
         fullName: 'Hacker Intruso',
         email: `hacker.${Date.now()}@fundacionimara.org`,
         password: 'StrongPassword123!@#',
+        phone: '+57 310 000 0008',
         role: 'ADMIN', // Intento no autorizado de registrarse como administrador
         userType: 'GENERATOR',
         dataPolicyAccepted: true,

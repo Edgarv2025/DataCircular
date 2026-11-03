@@ -1,18 +1,44 @@
 import React, { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, usePathname, useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import { Colors } from '../../src/theme/colors';
 
 export default function AppLayout() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.replace('/(auth)/login');
     }
   }, [isLoading, isAuthenticated]);
+
+  useEffect(() => {
+    if (isLoading || !isAuthenticated || !user) return;
+    const isAdmin = user.role === 'ADMIN';
+    const isAdminScreen =
+      pathname.endsWith('/admin') ||
+      pathname.endsWith('/users') ||
+      pathname.endsWith('/profile') ||
+      pathname.endsWith('/edit-profile');
+    if (isAdmin && !isAdminScreen) {
+      router.replace('/(app)/admin');
+      return;
+    }
+    if (pathname.endsWith('/admin') && !isAdmin) {
+      router.replace('/(app)/profile');
+    } else if (
+      pathname === '/(app)' || pathname === '/(app)/'
+    ) {
+      if (isAdmin) {
+        router.replace('/(app)/admin');
+      } else if (user.userType === 'GENERATOR') {
+        router.replace('/(app)/publish');
+      }
+    }
+  }, [isLoading, isAuthenticated, user, pathname]);
 
   if (isLoading) {
     return (
@@ -42,6 +68,7 @@ export default function AppLayout() {
       <Stack.Screen name="chat" />
       <Stack.Screen name="profile" />
       <Stack.Screen name="edit-profile" />
+      <Stack.Screen name="edit-publication/[id]" />
       <Stack.Screen name="users" />
       <Stack.Screen name="admin" />
     </Stack>

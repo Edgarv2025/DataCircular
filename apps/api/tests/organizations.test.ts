@@ -4,6 +4,7 @@ import { app } from '../src/app';
 import { prisma } from '../src/database/prisma';
 import { usersRepository } from '../src/modules/users/users.repository';
 import { organizationsRepository } from '../src/modules/organizations/organizations.repository';
+import { catalogRepository } from '../src/modules/catalog/catalog.repository';
 
 describe('Fase 7 - Módulo de Organizaciones, Membresías, Roles y Permisos (/api/v1/organizations)', () => {
   const createdUserIds: string[] = [];
@@ -80,6 +81,7 @@ describe('Fase 7 - Módulo de Organizaciones, Membresías, Roles y Permisos (/ap
         fullName: 'Admin Plataforma IMARA',
         email: `platformadmin.${Date.now()}@imara.org`,
         password: 'Password123!@#',
+        phone: '+57 310 000 0002',
         userType: 'TRANSFORMER',
         dataPolicyAccepted: true,
       });
@@ -139,6 +141,7 @@ describe('Fase 7 - Módulo de Organizaciones, Membresías, Roles y Permisos (/ap
   describe('2. Creación y Registro de Organizaciones / Empresas', () => {
     it('2.1 Debe crear exitosamente una empresa con datos colombianos y asignar al usuario como OWNER', async () => {
       const uniqueNit = `901.${Math.floor(100000 + Math.random() * 900000)}-1`;
+      const materialCategoryId = (await catalogRepository.listCategoriesTree())[0].subcategories![0].id;
       const res = await request(app)
         .post('/api/v1/organizations')
         .set('Authorization', `Bearer ${ownerToken}`)
@@ -148,6 +151,7 @@ describe('Fase 7 - Módulo de Organizaciones, Membresías, Roles y Permisos (/ap
           taxId: uniqueNit,
           orgType: 'COMPANY',
           activityType: 'TRANSFORMER',
+          materialCategoryIds: [materialCategoryId],
           email: 'contacto@ecotransformaciones.co',
           phone: '+57 310 999 8877',
           address: 'Carrera 68 # 19-45 Zona Industrial',
@@ -167,9 +171,24 @@ describe('Fase 7 - Módulo de Organizaciones, Membresías, Roles y Permisos (/ap
       expect(res.body.data.status).toBe('ACTIVE');
       expect(res.body.data.verificationStatus).toBe('UNVERIFIED');
       expect(res.body.data.userRole).toBe('OWNER');
+      expect(res.body.data.materialCategoryIds).toContain(materialCategoryId);
 
       createdOrgId = res.body.data.id;
       createdOrgIds.push(createdOrgId);
+    });
+
+    it('2.2.1 Un administrador de plataforma no puede crear organizaciones operativas', async () => {
+      const res = await request(app)
+        .post('/api/v1/organizations')
+        .set('Authorization', `Bearer ${platformAdminToken}`)
+        .send({
+          name: 'Organización de administrador',
+          orgType: 'COMPANY',
+          activityType: 'GENERATOR',
+        });
+
+      expect(res.status).toBe(403);
+      expect(res.body.success).toBe(false);
     });
 
     it('2.2 Debe rechazar la creación de una organización con NIT duplicado (409 Conflict)', async () => {

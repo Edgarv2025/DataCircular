@@ -3,15 +3,26 @@ import {
   createCategorySchema,
   updateCategorySchema,
   createUnitSchema,
+  updateUnitSchema,
 } from '@data-circular/shared';
 import { catalogService } from './catalog.service';
 import { sendSuccess } from '../../utils/apiResponse';
 
 export class CatalogController {
-  async listCategories(_req: Request, res: Response, next: NextFunction): Promise<void> {
+  async listCategories(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const categories = await catalogService.listCategoriesTree();
+      const includeInactive = req.query.includeInactive === 'true' && req.user?.role === 'ADMIN';
+      const categories = await catalogService.listCategoriesTree(!includeInactive);
       sendSuccess(res, categories, 'Catálogo de categorías de material obtenido exitosamente');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async deleteCategory(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      await catalogService.deleteCategory(req.params.id);
+      sendSuccess(res, { id: req.params.id, active: false }, 'Categoría eliminada del catálogo');
     } catch (err) {
       next(err);
     }
@@ -46,10 +57,30 @@ export class CatalogController {
     }
   }
 
-  async listUnits(_req: Request, res: Response, next: NextFunction): Promise<void> {
+  async listUnits(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const units = await catalogService.listUnits();
+      const includeInactive = req.query.includeInactive === 'true' && req.user?.role === 'ADMIN';
+      const units = await catalogService.listUnits(!includeInactive);
       sendSuccess(res, units, 'Catálogo de unidades de medida obtenido exitosamente');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async updateUnit(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const data = updateUnitSchema.parse(req.body);
+      const unit = await catalogService.updateUnit(req.params.id, data);
+      sendSuccess(res, unit, 'Unidad de medida actualizada exitosamente');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async deleteUnit(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const unit = await catalogService.deleteUnit(req.params.id);
+      sendSuccess(res, unit, 'Unidad de medida eliminada del catálogo');
     } catch (err) {
       next(err);
     }

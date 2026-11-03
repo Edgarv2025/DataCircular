@@ -26,7 +26,7 @@
   2. **Área Geográfica Inicial**: Bogotá D.C. y sus 20 localidades oficiales (Usaquén, Chapinero, Santa Fe, San Cristóbal, Usme, Tunjuelito, Bosa, Kennedy, Fontibón, Engativá, Suba, Barrios Unidos, Teusaquillo, Los Mártires, Antonio Nariño, Puente Aranda, La Candelaria, Rafael Uribe Uribe, Ciudad Bolívar, Sumapaz). Coordenadas base: `Lat: 4.7110`, `Lng: -74.0721`.
   3. **Telefonía**: Indicativo nacional `+57` y formato de telefonía móvil colombiana (`+57 3XX XXX XXXX`).
   4. **Zona Horaria Oficial**: `America/Bogota` (UTC-5).
-  5. **Normativa de Materiales**: Categorías alineadas con la Resolución 2184 de 2019 del Ministerio de Ambiente y Desarrollo Sostenible de Colombia (Plásticos, Metales, Papel/Cartón, Vidrio, RAEE, Textiles, Orgánicos).
+  5. **Separación de residuos**: La Resolución 2184 de 2019 sirve de referencia para separar residuos aprovechables y no aprovechables; el catálogo operativo de DATA_CIRCULAR amplía esa clasificación para cubrir los materiales ofrecidos y solicitados.
   6. **Marco Legal de Privacidad**: Ley Estatutaria 1581 de 2012 de Protección de Datos Personales (Habeas Data) y Decreto 1377 de 2013 de Colombia.
 - **Consecuencias**: Toda la interfaz móvil, contratos de datos, validaciones y lógica logística responden con precisión al contexto operativo de la Fundación IMARA en Bogotá.
 
@@ -56,7 +56,7 @@
 - **Fecha**: 2026-10-05
 - **Contexto**: Implementación del catálogo estructurado de materiales aprovechables y el modelo de publicaciones de oferta y necesidad para la economía circular, preparando los datos para el motor de coincidencia (Fase 9).
 - **Decisión**:
-  1. **Jerarquía Recursiva de Categorías (`parentId`)**: Se utiliza una auto-relación en `MaterialCategory` para modelar 9 categorías principales y 39 subcategorías hoja reales del mercado colombiano de reciclaje. Se excluyeron deliberadamente los residuos peligrosos (RESPEL) por estar fuera del alcance del MVP.
+  1. **Jerarquía Recursiva de Categorías (`parentId`)**: Se utiliza una auto-relación en `MaterialCategory` para modelar 11 categorías principales y 77 subcategorías. Las subcategorías de residuos hospitalarios y equipos con PCB se mantienen inactivas hasta decisión jurídica.
   2. **Regla de Hoja Obligatoria**: Las publicaciones no pueden apuntar a una categoría raíz (ej. "Plásticos" o "Metales"); deben especificar una subcategoría hoja (ej. "PET" o "Aluminio"), garantizando la granularidad requerida para el futuro matching.
   3. **No Dependencia de Condiciones de Usuario**: El emparejamiento (Fase 9) se realizará comparando publicaciones entre sí (oferta vs. necesidad según requerimientos 7.3 y 12), evitando tablas huérfanas de preferencias por usuario.
   4. **Evaluación Perezosa de Expiración (Lazy Expiration Check)**: Al consultar cualquier publicación, el sistema evalúa dinámicamente si `expiresAt < now()` y refleja el estado `EXPIRED` de inmediato, sincronizando PostgreSQL sin necesidad de cron jobs adicionales en este momento.
@@ -80,4 +80,12 @@
   6. **Contador Liviano en Detalle de Publicación**: `GET /publications/:id` calcula en tiempo real `publicacionesCompatibles` para informar al emisor si existen oportunidades inmediatas de valorización.
 - **Consecuencias**: Motor de búsqueda y coincidencias rápido, auditable, escalable y 100% cubierto con pruebas automatizadas (88 pruebas unitarias/integración y suite móvil pasando al 100%).
 
-
+## ADR-011: Expansión de Cobertura a Nivel Nacional y Adopción de Ciudades y Municipios
+- **Fecha**: 2026-10-30
+- **Contexto**: Expansión del alcance territorial del sistema DATA_CIRCULAR, transitando del enfoque original exclusivo en Bogotá D.C. a una cobertura nacional en Colombia.
+- **Decisión**:
+  1. **Cobertura Nacional**: Se extiende la cobertura de la plataforma a toda Colombia, permitiendo la interacción y trazabilidad de materiales entre participantes de todas las regiones del país.
+  2. **Ciudades y Municipios en Orden Alfabético**: Se sustituye el esquema de selección distrital por un catálogo de ciudades, capitales departamentales y municipios en orden alfabético estricto (A-Z) (`COLOMBIA_MUNICIPALITIES`), excluyendo las 20 localidades internas de Bogotá.
+  3. **Opción 'Otro' y Entrada Libre de Lugar**: Para dar cabida a municipios lejanos no listados o participantes de otros países, se incorporó la opción "Otro", que despliega un campo de texto interactivo para escribir libremente el nombre del lugar tanto en el selector modal (`LocalityPicker`) como en el filtro (`FilterModal`), garantizando flexibilidad total sin perder validación de longitud y sanitización.
+  4. **Interfaz Móvil y Contratos**: Se actualizan los componentes visuales (`LocalityPicker` / `CityPicker`, `FilterModal`, `MaterialCard`, `MatchCard`), formularios de registro y publicación, adaptando los textos, placeholders y filtros a "ciudad o municipio".
+- **Consecuencias**: Plataforma escalable a nivel país sin fricción de migración ni incompatibilidad con datos existentes.

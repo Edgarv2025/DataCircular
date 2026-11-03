@@ -1,19 +1,19 @@
 import { Router, Request, Response } from 'express';
-import { BOGOTA_LOCALITIES } from '@data-circular/shared';
+import { COLOMBIA_MUNICIPALITIES } from '@data-circular/shared';
 
 const router = Router();
 
 router.get('/', (_req: Request, res: Response) => {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
 
-  const localitiesOptions = BOGOTA_LOCALITIES.map((loc) => `<option value="${loc}">${loc}</option>`).join('');
+  const localitiesOptions = COLOMBIA_MUNICIPALITIES.map((loc) => `<option value="${loc}">${loc}</option>`).join('');
 
   res.send(`<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DATA_CIRCULAR - Consola de Verificación en Vivo (Bogotá, Colombia)</title>
+  <title>DATA_CIRCULAR - Consola de Verificación en Vivo (Colombia)</title>
   <style>
     :root {
       --primary: #1B4332;
@@ -72,7 +72,7 @@ router.get('/', (_req: Request, res: Response) => {
     </header>
 
     <div class="banner-bogota">
-      <span>📍 <strong>Territorio:</strong> Bogotá D.C., Colombia &middot; <strong>Moneda:</strong> Peso Colombiano (COP) &middot; <strong>Zona Horaria:</strong> America/Bogota (UTC-5)</span>
+      <span>📍 <strong>Territorio:</strong> Cobertura Nacional, Colombia &middot; <strong>Moneda:</strong> Peso Colombiano (COP) &middot; <strong>Zona Horaria:</strong> America/Bogota (UTC-5)</span>
       <button class="btn-outline" style="width:auto; padding:4px 12px; margin:0;" onclick="window.open('http://localhost:5555', '_blank')">Abrir Prisma Studio (BD Visual)</button>
     </div>
 
@@ -90,7 +90,7 @@ router.get('/', (_req: Request, res: Response) => {
             <h2>🩺 1. Estado y Base de Datos</h2>
             <span class="method-badge method-get">GET /api/v1/health</span>
           </div>
-          <p style="font-size:12px; color:var(--muted); margin-bottom:8px;">Verifica en tiempo real la conectividad y latencia con PostgreSQL en Bogotá.</p>
+          <p style="font-size:12px; color:var(--muted); margin-bottom:8px;">Verifica en tiempo real la conectividad y latencia con PostgreSQL en Colombia.</p>
         </div>
         <div>
           <button onclick="runHealth()">Probar Conexión PostgreSQL</button>
@@ -102,17 +102,18 @@ router.get('/', (_req: Request, res: Response) => {
       <div class="card">
         <div>
           <div class="card-header">
-            <h2>📝 2. Registro de Usuario (Bogotá)</h2>
+            <h2>📝 2. Registro de Usuario (Colombia)</h2>
             <span class="method-badge method-post">POST /api/v1/auth/register</span>
           </div>
           <div class="form-row">
             <div class="form-group">
               <label>Nombre Completo</label>
-              <input type="text" id="reg-name" value="Recuperador Bogotá">
+              <input type="text" id="reg-name" value="Recuperador Nacional">
             </div>
             <div class="form-group">
-              <label>Localidad de Bogotá</label>
-              <select id="reg-loc">${localitiesOptions}</select>
+              <label>Ciudad o Municipio</label>
+              <select id="reg-loc" onchange="toggleOtherInput(this.value)">${localitiesOptions}</select>
+              <input type="text" id="reg-loc-custom" placeholder="Escribe el municipio lejano o país..." style="display:none; margin-top:6px;">
             </div>
           </div>
           <div class="form-row">
@@ -230,6 +231,14 @@ router.get('/', (_req: Request, res: Response) => {
   <script>
     let activeToken = null;
     let currentUserId = null;
+
+    function toggleOtherInput(val) {
+      const customEl = document.getElementById('reg-loc-custom');
+      if (customEl) {
+        customEl.style.display = val === 'Otro' ? 'block' : 'none';
+        if (val === 'Otro') customEl.focus();
+      }
+    }
 
     async function runHealth() {
       const el = document.getElementById('out-health');

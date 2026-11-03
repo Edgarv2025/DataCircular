@@ -1,6 +1,6 @@
 /**
  * Datos de Muestra (Mocks) para Propuestas Comerciales Circulares
- * Cantidades en COP y puntos de entrega en Bogotá D.C.
+ * Cantidades en COP y puntos de entrega a nivel nacional (Colombia).
  */
 
 export interface ProposalMock {

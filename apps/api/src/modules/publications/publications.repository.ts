@@ -27,6 +27,8 @@ export function toPublicationDto(pub: any): MaterialPublicationDto {
     categoryId: pub.categoryId,
     quantity: Number(pub.quantity),
     unitId: pub.unitId,
+    description: pub.description,
+    requiresTransport: pub.requiresTransport,
     locationAddress: pub.locationAddress,
     locationCity: pub.locationCity,
     locationArea: pub.locationArea,
@@ -96,6 +98,8 @@ export class PublicationsRepository {
         categoryId: input.categoryId,
         quantity: input.quantity,
         unitId: input.unitId,
+        description: input.description || null,
+        requiresTransport: input.requiresTransport || false,
         locationAddress: input.locationAddress.trim(),
         locationCity: input.locationCity || 'Bogotá D.C.',
         locationArea: input.locationArea || null,
@@ -154,6 +158,8 @@ export class PublicationsRepository {
       data: {
         ...(input.quantity !== undefined ? { quantity: input.quantity } : {}),
         ...(input.unitId ? { unitId: input.unitId } : {}),
+        ...(input.description !== undefined ? { description: input.description || null } : {}),
+        ...(input.requiresTransport !== undefined ? { requiresTransport: input.requiresTransport } : {}),
         ...(input.locationAddress ? { locationAddress: input.locationAddress.trim() } : {}),
         ...(input.locationCity ? { locationCity: input.locationCity.trim() } : {}),
         ...(input.locationArea !== undefined ? { locationArea: input.locationArea || null } : {}),
@@ -203,6 +209,7 @@ export class PublicationsRepository {
       prisma.materialPublication.findMany({
         where: {
           ownerUserId: userId,
+          type: 'OFFER',
           deletedAt: null,
         },
         include: {
@@ -220,6 +227,7 @@ export class PublicationsRepository {
       prisma.materialPublication.count({
         where: {
           ownerUserId: userId,
+          type: 'OFFER',
           deletedAt: null,
         },
       }),
@@ -237,6 +245,7 @@ export class PublicationsRepository {
     const [pubs, total] = await Promise.all([
       prisma.materialPublication.findMany({
         where: {
+          type: 'OFFER',
           deletedAt: null,
         },
         include: {
@@ -253,6 +262,7 @@ export class PublicationsRepository {
       }),
       prisma.materialPublication.count({
         where: {
+          type: 'OFFER',
           deletedAt: null,
         },
       }),
@@ -276,23 +286,12 @@ export class PublicationsRepository {
     const skip = (page - 1) * pageSize;
     const now = new Date();
 
-    // Sincronizar automáticamente publicaciones con expiresAt vencido (Fase 8 & 9)
-    await prisma.materialPublication.updateMany({
-      where: {
-        status: 'ACTIVE',
-        expiresAt: { lt: now },
-      },
-      data: {
-        status: 'EXPIRED',
-      },
-    }).catch(() => {});
+    const where: any = {
+      type: 'OFFER',
+      ownerUser: { role: 'USER' },
+    };
 
-    const where: any = {};
-
-    // 1. Filtro por tipo de publicación (OFFER o NEED)
-    if (query.type) {
-      where.type = query.type;
-    }
+    // La plataforma solo publica ofertas; NEED se conserva para datos históricos.
 
     // 2. Filtro jerárquico por categoría
     if (query.categoryId) {
@@ -355,6 +354,9 @@ export class PublicationsRepository {
 
     // 7. Reglas de visibilidad y estado
     const requestedStatus = query.status || 'ACTIVE';
+    if (user.userType === 'GENERATOR') {
+      where.ownerUserId = user.id;
+    }
 
     if (requestedStatus === 'ACTIVE') {
       // Estado activo por defecto: excluir publicaciones borradas y expiradas
@@ -372,7 +374,17 @@ export class PublicationsRepository {
     } else {
       // Si se pide explícitamente EXPIRED o CLOSED:
       // Solo son visibles para su dueño o miembros autorizados de la organización dueña
-      where.status = requestedStatus;
+      where.AND = [
+        ...(where.AND || []),
+        requestedStatus === 'EXPIRED'
+          ? {
+              OR: [
+                { status: 'EXPIRED' },
+                { status: 'ACTIVE', expiresAt: { lte: now } },
+              ],
+            }
+          : { status: requestedStatus },
+      ];
 
       if (user.role !== 'ADMIN') {
         const memberships = await prisma.organizationMember.findMany({

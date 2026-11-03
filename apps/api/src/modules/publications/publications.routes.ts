@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticateToken } from '../../middleware/auth.middleware';
+import { authenticateToken, requireRole } from '../../middleware/auth.middleware';
 import { publicationsController } from './publications.controller';
 import { matchesController } from '../matches/matches.controller';
 
@@ -8,13 +8,13 @@ const publicationsRouter = Router();
 // Todas las rutas requieren token de autenticación válido
 publicationsRouter.use(authenticateToken);
 
-publicationsRouter.post('/', publicationsController.create);
-publicationsRouter.get('/mine', publicationsController.listMine);
-publicationsRouter.get('/search', publicationsController.search);
-publicationsRouter.get('/:id/matches', matchesController.getMatches);
-publicationsRouter.get('/', publicationsController.listAll);
-publicationsRouter.get('/:id', publicationsController.getById);
-publicationsRouter.patch('/:id', publicationsController.update);
-publicationsRouter.delete('/:id', publicationsController.delete);
+publicationsRouter.post('/', requireRole('USER'), publicationsController.create);
+publicationsRouter.get('/mine', requireRole('USER'), publicationsController.listMine);
+publicationsRouter.get('/search', requireRole('USER'), publicationsController.search);
+publicationsRouter.get('/:id/matches', requireRole('USER'), matchesController.getMatches);
+publicationsRouter.get('/', requireRole('ADMIN'), publicationsController.listAll);
+publicationsRouter.get('/:id', requireRole('USER'), publicationsController.getById);
+publicationsRouter.patch('/:id', requireRole('USER'), publicationsController.update);
+publicationsRouter.delete('/:id', requireRole('USER'), publicationsController.delete);
 
 export { publicationsRouter };

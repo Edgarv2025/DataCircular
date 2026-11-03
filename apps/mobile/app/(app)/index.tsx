@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -11,13 +11,12 @@ import {
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useAuth } from '../../src/context/AuthContext';
 import {
   MaterialPublicationDto,
   MaterialCategoryDto,
   UnitDto,
   SearchPublicationsQuery,
-  PublicationType,
-  MySuggestionsItemDto,
 } from '@data-circular/shared';
 import { Tokens } from '../../src/theme/tokens';
 import { BrandHeader } from '../../src/components/BrandHeader';
@@ -32,12 +31,13 @@ import { MatchesApi } from '../../src/api/matches.api';
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { user } = useAuth();
 
   // Estados de datos
   const [publications, setPublications] = useState<MaterialPublicationDto[]>([]);
   const [categories, setCategories] = useState<MaterialCategoryDto[]>([]);
   const [units, setUnits] = useState<UnitDto[]>([]);
-  const [suggestions, setSuggestions] = useState<MySuggestionsItemDto[]>([]);
+  const [suggestions, setSuggestions] = useState<MaterialPublicationDto[]>([]);
 
   // Estados de interfaz y filtros
   const [loading, setLoading] = useState(true);
@@ -48,8 +48,8 @@ export default function HomeScreen() {
   // Filtros activos
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | undefined>(undefined);
-  const [selectedType, setSelectedType] = useState<PublicationType | undefined>(undefined);
   const [advancedFilters, setAdvancedFilters] = useState<SearchPublicationsQuery>({});
+  const publicationRequestId = useRef(0);
 
   // Cargar catálogo inicial de materiales y unidades
   const loadCatalog = async () => {
@@ -60,65 +60,93 @@ export default function HomeScreen() {
       ]);
       setCategories(cats);
       setUnits(uns);
-    } catch (err: any) {
-      console.warn('Error cargando catálogo:', err.message);
+    } catch (error: unknown) {
+      setErrorMessage(
+        error instanceof Error ? error.message : 'No se pudo cargar el catálogo de materiales.'
+      );
     }
   };
 
   // Cargar publicaciones con filtros combinables (Fase 9)
   const fetchPublications = useCallback(async () => {
+    const requestId = ++publicationRequestId.current;
     setErrorMessage(null);
     try {
       const query: SearchPublicationsQuery = {
         ...advancedFilters,
-        type: selectedType,
+        type: 'OFFER',
         categoryId: selectedCategoryId,
       };
 
       const res = await PublicationsApi.search(query);
-      let list = res.data || [];
-
-      // Filtro local adicional de texto en el buscador si se escribe
-      if (searchQuery.trim()) {
-        const text = searchQuery.toLowerCase().trim();
-        list = list.filter((p) => {
-          const cat = p.category?.name?.toLowerCase() || '';
-          const loc = (p.locationArea || p.locationCity || '').toLowerCase();
-          const cond = (p.condition || '').toLowerCase();
-          return cat.includes(text) || loc.includes(text) || cond.includes(text);
-        });
+      if (requestId === publicationRequestId.current) {
+        setPublications(res.data || []);
       }
-
-      setPublications(list);
     } catch (err: any) {
-      setErrorMessage(err.message || 'Error al consultar publicaciones de materiales.');
+      if (requestId === publicationRequestId.current) {
+        setErrorMessage(err.message || 'Error al consultar publicaciones de materiales.');
+      }
+    } finally {
+      if (requestId === publicationRequestId.current) {
+        setLoading(false);
+      }
     }
-  }, [advancedFilters, selectedType, selectedCategoryId, searchQuery]);
+  }, [advancedFilters, selectedCategoryId]);
 
   // Cargar sugerencias de coincidencia propia
   const loadSuggestions = async () => {
     try {
       const res = await MatchesApi.getMySuggestions();
       setSuggestions(res || []);
-    } catch {
-      // Si el usuario no tiene publicaciones o no está autenticado, simplemente no muestra sugerencias
-      setSuggestions([]);
+    } catch (error: unknown) {
+      setErrorMessage(
+        error instanceof Error ? error.message : 'No se pudieron cargar las ofertas coincidentes.'
+      );
     }
   };
 
   const initData = async () => {
-    setLoading(true);
-    await Promise.all([loadCatalog(), fetchPublications(), loadSuggestions()]);
-    setLoading(false);
+    await Promise.all([loadCatalog(), loadSuggestions()]);
   };
 
   useEffect(() => {
-    initData();
-  }, []);
+    if (user?.role === 'ADMIN') {
+      router.replace('/(app)/admin');
+      return;
+    }
+    if (user?.userType === 'GENERATOR') {
+      router.replace('/(app)/publish');
+      return;
+    }
+    if (user?.role !== 'USER') return;
+    void initData();
+  }, [user?.userType, user?.role]);
 
   useEffect(() => {
-    fetchPublications();
-  }, [fetchPublications]);
+    if (user?.role === 'USER' && user.userType !== 'GENERATOR') {
+      void fetchPublications();
+    }
+    return () => {
+      publicationRequestId.current += 1;
+    };
+  }, [fetchPublications, user?.role, user?.userType]);
+
+  const visiblePublications = useMemo(() => {
+    const text = searchQuery.trim().toLocaleLowerCase();
+    if (!text) return publications;
+    return publications.filter((publication) => {
+      const category = publication.category?.name?.toLocaleLowerCase() || '';
+      const locality = (publication.locationArea || publication.locationCity || '').toLocaleLowerCase();
+      const condition = publication.condition?.toLocaleLowerCase() || '';
+      const description = publication.description?.toLocaleLowerCase() || '';
+      return (
+        category.includes(text) ||
+        locality.includes(text) ||
+        condition.includes(text) ||
+        description.includes(text)
+      );
+    });
+  }, [publications, searchQuery]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -162,7 +190,7 @@ export default function HomeScreen() {
             <TextInput
               value={searchQuery}
               onChangeText={setSearchQuery}
-              placeholder="Buscar PET, metales, cartón, localidad..."
+              placeholder="Buscar PET, metales, cartón, ciudad o municipio..."
               placeholderTextColor="#8B9F93"
               style={styles.searchInput}
               returnKeyType="search"
@@ -182,33 +210,7 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Pestañas de Tipo: OFERTAS vs NECESIDADES vs TODOS */}
-        <View style={styles.typeSegment}>
-          <TouchableOpacity
-            style={[styles.segmentBtn, !selectedType && styles.segmentBtnActive]}
-            onPress={() => setSelectedType(undefined)}
-          >
-            <Text style={[styles.segmentText, !selectedType && styles.segmentTextActive]}>
-              Todos
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.segmentBtn, selectedType === 'OFFER' && styles.segmentBtnActive]}
-            onPress={() => setSelectedType('OFFER')}
-          >
-            <Text style={[styles.segmentText, selectedType === 'OFFER' && styles.segmentTextActive]}>
-              Ofertas
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.segmentBtn, selectedType === 'NEED' && styles.segmentBtnActive]}
-            onPress={() => setSelectedType('NEED')}
-          >
-            <Text style={[styles.segmentText, selectedType === 'NEED' && styles.segmentTextActive]}>
-              Necesidades
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <Text style={styles.sectionSubtitle}>Ofertas publicadas por generadores</Text>
 
         {/* Carrusel horizontal de categorías (maqueta.jpg) */}
         <View style={styles.categoriesSection}>
@@ -247,16 +249,16 @@ export default function HomeScreen() {
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.suggestionsScroll}>
               {suggestions.map((item) => (
                 <TouchableOpacity
-                  key={item.publicationId}
+                  key={item.id}
                   style={styles.suggestionCard}
-                  onPress={() => router.push(`/(app)/publication/${item.publicationId}` as any)}
+                  onPress={() => router.push(`/(app)/publication/${item.id}` as any)}
                   activeOpacity={0.85}
                 >
                   <Text style={styles.suggCatName} numberOfLines={1}>
-                    {item.publication.category?.name || 'Material'}
+                    {item.category?.name || 'Material'}
                   </Text>
                   <Text style={styles.suggSub}>
-                    {item.matches.length} matches disponibles ({Math.round(item.matches[0]?.score || 0)}% top)
+                    Coincide con los materiales de tu organización
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -266,13 +268,9 @@ export default function HomeScreen() {
 
         <View style={styles.gridHeaderRow}>
           <Text style={styles.gridTitle}>
-            {selectedType === 'OFFER'
-              ? 'Ofertas Disponibles'
-              : selectedType === 'NEED'
-              ? 'Demandas de Material'
-              : 'Materiales Recuperables'}
+            Ofertas Disponibles
           </Text>
-          <Text style={styles.gridCount}>{publications.length} publicaciones</Text>
+          <Text style={styles.gridCount}>{visiblePublications.length} publicaciones</Text>
         </View>
 
         <ErrorBanner message={errorMessage} type="error" />
@@ -285,11 +283,11 @@ export default function HomeScreen() {
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Tokens.colors.primary} />
-          <Text style={styles.loadingText}>Cargando publicaciones distritales...</Text>
+          <Text style={styles.loadingText}>Cargando publicaciones de materiales...</Text>
         </View>
       ) : (
         <FlatList
-          data={publications}
+          data={visiblePublications}
           keyExtractor={(item) => item.id}
           numColumns={2}
           columnWrapperStyle={styles.columnWrapper}
@@ -437,16 +435,23 @@ const styles = StyleSheet.create({
   },
   sectionHeaderTitle: {
     fontSize: 15,
-    fontWeight: '800',
-    color: Tokens.colors.primaryDark,
+    fontWeight: '600',
+    color: Tokens.colors.brand.orangeStrong,
     paddingHorizontal: Tokens.spacing.lg,
     marginBottom: 8,
+  },
+  sectionSubtitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Tokens.colors.brand.orangeStrong,
+    paddingHorizontal: Tokens.spacing.lg,
+    marginTop: 8,
   },
   categoriesScroll: {
     paddingHorizontal: Tokens.spacing.md,
   },
   suggestionsBox: {
-    backgroundColor: '#EAF6EE',
+    backgroundColor: Tokens.colors.brand.orangeTint,
     marginHorizontal: Tokens.spacing.lg,
     borderRadius: 14,
     padding: 12,
@@ -459,11 +464,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
   },
   suggestionsTitle: {
     fontSize: 12,
-    fontWeight: '800',
-    color: Tokens.colors.primaryDark,
+    fontWeight: '600',
+    color: Tokens.colors.brand.orangeStrong,
   },
   suggestionsCount: {
     fontSize: 11,
@@ -504,8 +513,8 @@ const styles = StyleSheet.create({
   },
   gridTitle: {
     fontSize: 16,
-    fontWeight: '800',
-    color: Tokens.colors.textDark,
+    fontWeight: '600',
+    color: Tokens.colors.brand.orangeStrong,
   },
   gridCount: {
     fontSize: 12,

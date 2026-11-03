@@ -1,11 +1,11 @@
 import { Router } from 'express';
-import { authenticateToken } from '../../middleware/auth.middleware';
+import { authenticateToken, requireRole } from '../../middleware/auth.middleware';
 import { conversationsController } from './conversations.controller';
 
 const conversationsRouter = Router();
 
 // Todas las rutas requieren token de autenticación válido
-conversationsRouter.use(authenticateToken);
+conversationsRouter.use(authenticateToken, requireRole('USER'));
 
 // Rutas de conversaciones
 conversationsRouter.post('/', conversationsController.startConversation);
@@ -20,7 +20,7 @@ conversationsRouter.post('/:id/messages', conversationsController.sendMessage);
 conversationsRouter.post('/:id/proposals', conversationsController.createProposal);
 
 const proposalsRouter = Router();
-proposalsRouter.use(authenticateToken);
+proposalsRouter.use(authenticateToken, requireRole('USER'));
 
 // Respuestas a propuestas formales
 proposalsRouter.post('/:id/accept', conversationsController.acceptProposal);

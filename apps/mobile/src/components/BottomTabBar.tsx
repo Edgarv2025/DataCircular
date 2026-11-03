@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, Platform } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Tokens } from '../theme/tokens';
 import { ConversationsApi } from '../api/conversations.api';
+import { useAuth } from '../context/AuthContext';
 
 export type TabKey = 'home' | 'publish' | 'chat' | 'profile';
 
@@ -21,35 +22,41 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
   unreadChatCount: propUnreadCount,
 }) => {
   const router = useRouter();
+  const { user } = useAuth();
+  const canBrowse = user?.role === 'USER' && user.userType !== 'GENERATOR';
+  const canPublish = user?.role === 'USER' && user.userType === 'GENERATOR';
   const [dynamicUnread, setDynamicUnread] = useState<number>(propUnreadCount ?? 0);
 
-  useEffect(() => {
-    if (propUnreadCount !== undefined) {
-      setDynamicUnread(propUnreadCount);
-      return;
-    }
-
+  useFocusEffect(useCallback(() => {
+    if (user?.role !== 'USER' || propUnreadCount !== undefined) return;
     let isMounted = true;
+    let requestInFlight = false;
     const fetchUnread = async () => {
+      if (requestInFlight) return;
+      requestInFlight = true;
       try {
         const res = await ConversationsApi.getUnreadCount();
         if (isMounted && typeof res?.unreadCount === 'number') {
           setDynamicUnread(res.unreadCount);
         }
       } catch {
-        // Ignorar si no hay sesión activa
+        // El indicador es secundario; la bandeja sigue disponible si falla el conteo.
+      } finally {
+        requestInFlight = false;
       }
     };
 
-    fetchUnread();
-    const interval = setInterval(fetchUnread, 15000);
+    void fetchUnread();
+    const interval = setInterval(() => void fetchUnread(), 15000);
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [propUnreadCount]);
+  }, [propUnreadCount, user?.role]));
 
   const unreadChatCount = propUnreadCount !== undefined ? propUnreadCount : dynamicUnread;
+
+  if (user?.role !== 'USER') return null;
 
   const handleNavigate = (tab: TabKey) => {
     switch (tab) {
@@ -71,39 +78,33 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
   return (
     <View style={styles.container}>
       {/* 1. Inicio */}
-      <TouchableOpacity
+      {canBrowse ? <TouchableOpacity
         style={styles.tabItem}
         onPress={() => handleNavigate('home')}
         activeOpacity={0.7}
         accessibilityRole="button"
         accessibilityLabel="Pestaña Inicio"
       >
-        <Text style={[styles.tabIcon, activeTab === 'home' && styles.tabIconActive]}>
-          🏠
-        </Text>
         <Text style={[styles.tabLabel, activeTab === 'home' && styles.tabLabelActive]}>
           Inicio
         </Text>
-      </TouchableOpacity>
+      </TouchableOpacity> : null}
 
       {/* 2. Publicar */}
-      <TouchableOpacity
+      {canPublish ? <TouchableOpacity
         style={styles.tabItem}
         onPress={() => handleNavigate('publish')}
         activeOpacity={0.7}
         accessibilityRole="button"
         accessibilityLabel="Pestaña Publicar"
       >
-        <Text style={[styles.tabIcon, activeTab === 'publish' && styles.tabIconActive]}>
-          📋
-        </Text>
         <Text style={[styles.tabLabel, activeTab === 'publish' && styles.tabLabelActive]}>
           Publicar
         </Text>
-      </TouchableOpacity>
+      </TouchableOpacity> : null}
 
       {/* 3. Botón Central Flotante (+) */}
-      <View style={styles.floatingCenterContainer}>
+      {canPublish ? <View style={styles.floatingCenterContainer}>
         <TouchableOpacity
           style={styles.floatingButton}
           onPress={() => router.push('/(app)/publish')}
@@ -113,7 +114,7 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
         >
           <Text style={styles.plusIcon}>+</Text>
         </TouchableOpacity>
-      </View>
+      </View> : null}
 
       {/* 4. Chat */}
       <TouchableOpacity
@@ -124,9 +125,6 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
         accessibilityLabel="Pestaña Chat"
       >
         <View style={styles.chatIconWrapper}>
-          <Text style={[styles.tabIcon, activeTab === 'chat' && styles.tabIconActive]}>
-            💬
-          </Text>
           {unreadChatCount > 0 ? (
             <View style={styles.badge}>
               <Text style={styles.badgeText}>
@@ -148,9 +146,6 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
         accessibilityRole="button"
         accessibilityLabel="Pestaña Perfil"
       >
-        <Text style={[styles.tabIcon, activeTab === 'profile' && styles.tabIconActive]}>
-          👤
-        </Text>
         <Text style={[styles.tabLabel, activeTab === 'profile' && styles.tabLabelActive]}>
           Perfil
         </Text>

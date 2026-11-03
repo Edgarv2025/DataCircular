@@ -13,7 +13,7 @@ import queryString from 'query-string';
  */
 export const PublicationsApi = {
   /**
-   * Búsqueda general con filtros combinables (tipo, categoría, localidad, cantidad, etc.)
+   * Búsqueda general con filtros combinables (tipo, categoría, ciudad o municipio, cantidad, etc.)
    */
   async search(query: SearchPublicationsQuery = {}): Promise<PublicationSearchResultDto> {
     const qs = queryString.stringify(query as any, { skipNull: true, skipEmptyString: true });

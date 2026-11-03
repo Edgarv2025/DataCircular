@@ -9,8 +9,7 @@ import {
   View,
 } from 'react-native';
 import {
-  BOGOTA_LOCALITIES,
-  PublicationType,
+  COLOMBIA_MUNICIPALITIES,
   PublicationSortOption,
   UnitDto,
   SearchPublicationsQuery,
@@ -35,11 +34,16 @@ export const FilterModal: React.FC<FilterModalProps> = ({
   currentFilters,
   onApplyFilters,
 }) => {
-  const [selectedType, setSelectedType] = useState<PublicationType | undefined>(
-    currentFilters.type
-  );
   const [selectedArea, setSelectedArea] = useState<string | undefined>(
     currentFilters.area
+  );
+  const [customAreaText, setCustomAreaText] = useState<string>(
+    currentFilters.area && !COLOMBIA_MUNICIPALITIES.includes(currentFilters.area as any)
+      ? currentFilters.area
+      : ''
+  );
+  const [showCustomAreaInput, setShowCustomAreaInput] = useState<boolean>(
+    Boolean(currentFilters.area && !COLOMBIA_MUNICIPALITIES.includes(currentFilters.area as any))
   );
   const [minQty, setMinQty] = useState<string>(
     currentFilters.minQuantity ? String(currentFilters.minQuantity) : ''
@@ -58,8 +62,9 @@ export const FilterModal: React.FC<FilterModalProps> = ({
   );
 
   const handleReset = () => {
-    setSelectedType(undefined);
     setSelectedArea(undefined);
+    setCustomAreaText('');
+    setShowCustomAreaInput(false);
     setMinQty('');
     setMaxQty('');
     setSelectedUnitId(undefined);
@@ -71,7 +76,6 @@ export const FilterModal: React.FC<FilterModalProps> = ({
 
   const handleApply = () => {
     const applied: SearchPublicationsQuery = {
-      type: selectedType,
       area: selectedArea || undefined,
       minQuantity: minQty ? Number(minQty) : undefined,
       maxQuantity: maxQty ? Number(maxQty) : undefined,
@@ -101,29 +105,6 @@ export const FilterModal: React.FC<FilterModalProps> = ({
           </View>
 
           <ScrollView style={styles.scrollBody} showsVerticalScrollIndicator={false}>
-            {/* Tipo de Publicación */}
-            <Text style={styles.sectionLabel}>Tipo de Transacción</Text>
-            <View style={styles.pillRow}>
-              {[
-                { label: 'Todos', value: undefined },
-                { label: 'Ofertas', value: 'OFFER' as PublicationType },
-                { label: 'Necesidades', value: 'NEED' as PublicationType },
-              ].map((item, index) => {
-                const isSelected = selectedType === item.value;
-                return (
-                  <TouchableOpacity
-                    key={index}
-                    style={[styles.typePill, isSelected && styles.typePillSelected]}
-                    onPress={() => setSelectedType(item.value)}
-                  >
-                    <Text style={[styles.typePillText, isSelected && styles.typePillTextSelected]}>
-                      {item.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
             {/* Ordenamiento */}
             <Text style={styles.sectionLabel}>Criterio de Orden</Text>
             <View style={styles.pillRow}>
@@ -214,32 +195,60 @@ export const FilterModal: React.FC<FilterModalProps> = ({
               </>
             )}
 
-            {/* Localidad en Bogotá */}
-            <Text style={styles.sectionLabel}>Localidad de Bogotá D.C.</Text>
+            {/* Ciudad o Municipio */}
+            <Text style={styles.sectionLabel}>Ciudad o Municipio</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.localitiesScroll}>
               <TouchableOpacity
-                style={[styles.localityChip, !selectedArea && styles.localityChipSelected]}
-                onPress={() => setSelectedArea(undefined)}
+                style={[styles.localityChip, !selectedArea && !showCustomAreaInput && styles.localityChipSelected]}
+                onPress={() => {
+                  setSelectedArea(undefined);
+                  setShowCustomAreaInput(false);
+                }}
               >
-                <Text style={[styles.localityChipText, !selectedArea && styles.localityChipTextSelected]}>
-                  Todas las 20 localidades
+                <Text style={[styles.localityChipText, !selectedArea && !showCustomAreaInput && styles.localityChipTextSelected]}>
+                  Todas las ciudades / municipios
                 </Text>
               </TouchableOpacity>
-              {BOGOTA_LOCALITIES.map((loc) => {
-                const isSelected = selectedArea === loc;
+              {COLOMBIA_MUNICIPALITIES.map((loc) => {
+                const isOther = loc === 'Otro';
+                const isSelected = isOther ? showCustomAreaInput : selectedArea === loc;
                 return (
                   <TouchableOpacity
                     key={loc}
                     style={[styles.localityChip, isSelected && styles.localityChipSelected]}
-                    onPress={() => setSelectedArea(loc)}
+                    onPress={() => {
+                      if (isOther) {
+                        setShowCustomAreaInput(true);
+                        setSelectedArea(customAreaText.trim() || undefined);
+                      } else {
+                        setShowCustomAreaInput(false);
+                        setSelectedArea(loc);
+                      }
+                    }}
                   >
                     <Text style={[styles.localityChipText, isSelected && styles.localityChipTextSelected]}>
-                      📍 {loc}
+                      {isOther ? '➕ Otro' : `📍 ${loc}`}
                     </Text>
                   </TouchableOpacity>
                 );
               })}
             </ScrollView>
+
+            {showCustomAreaInput && (
+              <View style={{ marginTop: 8 }}>
+                <Text style={styles.inputSublabel}>Escribe el municipio lejano o país a filtrar:</Text>
+                <TextInput
+                  style={styles.quantityInput}
+                  placeholder="ej: Barichara, Villa de Leyva, etc."
+                  placeholderTextColor="#9AA0A6"
+                  value={customAreaText}
+                  onChangeText={(text) => {
+                    setCustomAreaText(text);
+                    setSelectedArea(text.trim() || undefined);
+                  }}
+                />
+              </View>
+            )}
 
             <View style={{ height: 24 }} />
           </ScrollView>

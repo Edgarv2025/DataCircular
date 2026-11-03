@@ -12,47 +12,21 @@ interface CategoryChipProps {
 }
 
 export function getCategoryIcon(name: string): string {
-  const normalized = name.toLowerCase();
-  if (normalized.includes('plástic') || normalized.includes('pet') || normalized.includes('hdpe') || normalized.includes('pead')) {
-    return '🧴';
-  }
-  if (normalized.includes('metal') || normalized.includes('chatarra') || normalized.includes('aluminio') || normalized.includes('cobre')) {
-    return '🥫';
-  }
-  if (normalized.includes('papel') || normalized.includes('cartón') || normalized.includes('carton') || normalized.includes('archivo')) {
-    return '📦';
-  }
-  if (normalized.includes('vidrio') || normalized.includes('botella')) {
-    return '🍾';
-  }
-  if (normalized.includes('raee') || normalized.includes('electrón') || normalized.includes('comput')) {
-    return '💻';
-  }
-  if (normalized.includes('textil') || normalized.includes('retazo') || normalized.includes('algod')) {
-    return '👕';
-  }
-  if (normalized.includes('orgánic') || normalized.includes('compost') || normalized.includes('biomasa')) {
-    return '🌱';
-  }
-  if (normalized.includes('todo') || normalized.includes('todos')) {
-    return '♻️';
-  }
-  return '♻️';
+  return '';
 }
 
 /**
- * Chip de categoría estilo maqueta (maqueta.jpg):
- * Squircle en verde salvia (#E4EEE4) con ícono al centro y texto debajo.
+ * Chip de categoría estilo limpio y accesible:
+ * Squircle en verde salvia (#E4EEE4) con sigla tipográfica al centro y texto debajo.
  */
 export const CategoryChip: React.FC<CategoryChipProps> = ({
   id,
   name,
-  icon,
   isSelected = false,
   onPress,
   style,
 }) => {
-  const displayIcon = icon || getCategoryIcon(name);
+  const shortCode = name === 'Todos' ? 'ALL' : name.substring(0, 2).toUpperCase();
 
   return (
     <TouchableOpacity
@@ -67,8 +41,8 @@ export const CategoryChip: React.FC<CategoryChipProps> = ({
           isSelected && styles.squircleSelected,
         ]}
       >
-        <Text style={[styles.icon, isSelected && styles.iconSelected]}>
-          {displayIcon}
+        <Text style={[styles.codeText, isSelected && styles.codeTextSelected]}>
+          {shortCode}
         </Text>
       </View>
       <Text
@@ -104,11 +78,14 @@ const styles = StyleSheet.create({
     backgroundColor: Tokens.colors.primary,
     borderColor: Tokens.colors.primaryDark,
   },
-  icon: {
-    fontSize: 26,
+  codeText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: Tokens.colors.primaryDark,
+    letterSpacing: 0.5,
   },
-  iconSelected: {
-    transform: [{ scale: 1.08 }],
+  codeTextSelected: {
+    color: '#FFFFFF',
   },
   label: {
     marginTop: 6,

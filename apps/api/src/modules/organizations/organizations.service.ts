@@ -14,6 +14,7 @@ import {
 } from '@data-circular/shared';
 import { organizationsRepository } from './organizations.repository';
 import { usersRepository } from '../users/users.repository';
+import { catalogRepository } from '../catalog/catalog.repository';
 
 export class OrganizationError extends Error {
   constructor(
@@ -35,6 +36,26 @@ export class OrganizationsService {
     input: CreateOrganizationInput,
     creatorUserId: string
   ): Promise<OrganizationDto> {
+    const materialCategoryIds = input.materialCategoryIds || [];
+    if (input.activityType !== 'GENERATOR' && materialCategoryIds.length === 0) {
+      throw new OrganizationError(
+        'MATERIAL_CATEGORIES_REQUIRED',
+        'Selecciona al menos un material del catálogo para recibir coincidencias.',
+        400
+      );
+    }
+
+    for (const categoryId of materialCategoryIds) {
+      const category = await catalogRepository.findCategoryById(categoryId);
+      if (!category || !category.active) {
+        throw new OrganizationError(
+          'INVALID_MATERIAL_CATEGORY',
+          'Una de las categorías seleccionadas no existe o está inactiva.',
+          400
+        );
+      }
+    }
+
     if (input.taxId) {
       const existing = await organizationsRepository.findByTaxId(input.taxId);
       if (existing) {

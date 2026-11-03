@@ -10,13 +10,16 @@
   "scripts": {
     "dev": "node scripts/dev.js",
     "dev:api": "npm --workspace=apps/api run dev",
+    "build": "npm --workspace=packages/shared run build && npm --workspace=apps/api run build",
     "build:api": "npm --workspace=apps/api run build",
     "start:api": "npm --workspace=apps/api run start",
     "test:api": "npm --workspace=apps/api run test",
     "test:mobile": "npm --workspace=apps/mobile run test:flow",
+    "test:full": "npm --workspace=apps/mobile run test:full-flow",
     "db:migrate": "npm --workspace=apps/api run db:migrate",
     "db:generate": "npm --workspace=apps/api run db:generate",
     "db:studio": "npm --workspace=apps/api run db:studio",
+    "db:clean": "npm --workspace=apps/api run db:clean",
     "dev:mobile": "npm --workspace=apps/mobile run start",
     "mobile:web": "npm --workspace=apps/mobile run web",
     "mobile:android": "npm --workspace=apps/mobile run android",
@@ -29,6 +32,8 @@
     "data-circular",
     "imara"
   ],
-  "author": "Fundación IMARA / DATA_CIRCULAR Team",
+  "author": "Edgar Vásquez",
+  "owner": "Fundación IMARA",
+  "copyright": "© 2026 Fundación IMARA",
   "license": "UNLICENSED"
 }

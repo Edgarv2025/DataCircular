@@ -2,18 +2,22 @@
   "name": "@data-circular/api",
   "version": "0.1.0",
   "private": true,
+  "author": "Edgar Vásquez",
+  "owner": "Fundación IMARA",
+  "copyright": "© 2026 Fundación IMARA",
   "description": "Backend API REST para DATA_CIRCULAR - Fundación IMARA",
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc && node scripts/copy-client.js",
     "start": "node dist/server.js",
-    "test": "vitest run",
+    "test": "vitest run --fileParallelism false",
     "test:watch": "vitest",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "db:clean": "tsx scripts/reset-db-for-eval.ts"
   },
   "dependencies": {
     "@data-circular/shared": "*",

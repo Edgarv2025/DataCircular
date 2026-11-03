@@ -12,7 +12,7 @@ organizationsRouter.use(authenticateToken);
 organizationsRouter.get('/roles/available', organizationsController.listRoles);
 
 // CRUD básico de Organizaciones
-organizationsRouter.post('/', organizationsController.create);
+organizationsRouter.post('/', requireRole('USER'), organizationsController.create);
 organizationsRouter.get('/', organizationsController.list);
 organizationsRouter.get('/:id', organizationsController.getById);
 

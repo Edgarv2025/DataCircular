@@ -8,6 +8,10 @@ import {
   AdminUpdateUserInput,
 } from '@data-circular/shared';
 
+type UserWithTransportCategories = User & {
+  transportMaterialCategories?: { categoryId: string }[];
+};
+
 /**
  * Normaliza una dirección de correo electrónico:
  * Convierte a minúsculas y elimina espacios iniciales/finales.
@@ -20,7 +24,7 @@ export function normalizeEmail(email: string): string {
  * Mapea una entidad User completa de la BD a un DTO seguro (SafeUserDto).
  * Garantiza que passwordHash NUNCA se filtre a capas superiores ni clientes.
  */
-export function toSafeUser(user: User): SafeUserDto {
+export function toSafeUser(user: UserWithTransportCategories): SafeUserDto {
   return {
     id: user.id,
     fullName: user.fullName,
@@ -29,6 +33,7 @@ export function toSafeUser(user: User): SafeUserDto {
     userType: user.userType as SafeUserDto['userType'],
     status: user.status as SafeUserDto['status'],
     role: user.role as SafeUserDto['role'],
+    transportCategoryIds: user.transportMaterialCategories?.map(({ categoryId }) => categoryId) || [],
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
     deletedAt: user.deletedAt ? user.deletedAt.toISOString() : null,
@@ -52,6 +57,7 @@ export function toPublicUser(user: User | SafeUserDto): PublicUserDto {
 export class UsersRepository {
   async listAll(): Promise<SafeUserDto[]> {
     const users = await prisma.user.findMany({
+      include: { transportMaterialCategories: true },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -85,6 +91,7 @@ export class UsersRepository {
             }
           : {}),
       },
+      include: { transportMaterialCategories: true },
     });
 
     return toSafeUser(user);
@@ -99,6 +106,7 @@ export class UsersRepository {
         id,
         ...(includeDeleted ? {} : { deletedAt: null }),
       },
+      include: { transportMaterialCategories: true },
     });
 
     return user ? toSafeUser(user) : null;
@@ -109,12 +117,13 @@ export class UsersRepository {
    * Retorna la entidad User completa (incluyendo passwordHash).
    * EXCLUSIVO para flujos internos de autenticación.
    */
-  async findByEmailForAuth(email: string): Promise<User | null> {
+  async findByEmailForAuth(email: string): Promise<UserWithTransportCategories | null> {
     return prisma.user.findFirst({
       where: {
         email: normalizeEmail(email),
         deletedAt: null,
       },
+      include: { transportMaterialCategories: true },
     });
   }
 
@@ -127,6 +136,7 @@ export class UsersRepository {
         email: normalizeEmail(email),
         ...(includeDeleted ? {} : { deletedAt: null }),
       },
+      include: { transportMaterialCategories: true },
     });
 
     return user ? toSafeUser(user) : null;
@@ -135,13 +145,31 @@ export class UsersRepository {
   /**
    * Actualiza los datos permitidos del perfil propio (solo fullName y phone).
    */
-  async update(id: string, input: UpdateUserInput): Promise<SafeUserDto> {
+  async update(
+    id: string,
+    input: UpdateUserInput & { transportCategoryIds?: string[] }
+  ): Promise<SafeUserDto> {
     const user = await prisma.user.update({
       where: { id },
       data: {
         ...(input.fullName ? { fullName: input.fullName.trim() } : {}),
         ...(input.phone !== undefined ? { phone: input.phone ? input.phone.trim() : null } : {}),
+        ...(input.transportCategoryIds !== undefined
+          ? {
+              transportMaterialCategories: {
+                deleteMany: {},
+                ...(input.transportCategoryIds.length > 0
+                  ? {
+                      create: input.transportCategoryIds.map((categoryId) => ({
+                        category: { connect: { id: categoryId } },
+                      })),
+                    }
+                  : {}),
+              },
+            }
+          : {}),
       },
+      include: { transportMaterialCategories: true },
     });
 
     return toSafeUser(user);
@@ -161,6 +189,7 @@ export class UsersRepository {
         ...(input.role ? { role: input.role as UserRole } : {}),
         ...(input.status === 'ACTIVE' ? { deletedAt: null } : {}),
       },
+      include: { transportMaterialCategories: true },
     });
 
     return toSafeUser(user);
@@ -177,6 +206,7 @@ export class UsersRepository {
         status: UserStatus.INACTIVE,
         deletedAt: new Date(),
       },
+      include: { transportMaterialCategories: true },
     });
 
     return toSafeUser(user);

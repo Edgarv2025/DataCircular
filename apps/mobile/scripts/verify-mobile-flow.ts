@@ -6,7 +6,7 @@ import { ApiError } from '../src/api/client';
 async function main() {
   console.log('=====================================================');
   console.log('  VERIFICACIÓN E2E DE FLUJOS MÓVILES - FASE 5');
-  console.log('  DATA_CIRCULAR • Fundación IMARA (Bogotá D.C.)');
+  console.log('  DATA_CIRCULAR • Fundación IMARA (Colombia)');
   console.log('=====================================================\n');
 
   const timestamp = Date.now();
@@ -47,6 +47,9 @@ async function main() {
   console.log('     - Nombre:', profile.fullName);
   console.log('     - Teléfono:', profile.phone);
   console.log('     - Estado:', profile.status);
+  if (profile.phone !== testUser.phone) {
+    throw new Error('El teléfono completo del registro no se guardó en el perfil.');
+  }
 
   console.log('\n4. [PANTALLA 5 - EDICIÓN DE PERFIL] Actualizando perfil (PATCH /users/me)...');
   const updatedName = `${testUser.fullName} (Actualizado)`;
@@ -109,10 +112,10 @@ async function main() {
 
   console.log('\n=====================================================');
   console.log('  ¡TODOS LOS FLUJOS MÓVILES DE LA FASE 5 VERIFICADOS!');
-  console.log('  1. Bienvenida (Onboarding distrital)');
+  console.log('  1. Bienvenida (Onboarding nacional)');
   console.log('  2. Registro (con validación y datos reales)');
   console.log('  3. Inicio de sesión (con JWT y persistencia)');
-  console.log('  4. Perfil de usuario (con datos de Bogotá y COP)');
+  console.log('  4. Perfil de usuario (con datos de Colombia y COP)');
   console.log('  5. Edición de perfil (con llamada PATCH)');
   console.log('  6. Cierre de sesión y desactivación lógica');
   console.log('=====================================================\n');

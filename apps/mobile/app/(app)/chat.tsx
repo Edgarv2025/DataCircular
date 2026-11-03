@@ -15,15 +15,19 @@ import { useLocalSearchParams } from 'expo-router';
 import { Tokens } from '../../src/theme/tokens';
 import { BrandHeader } from '../../src/components/BrandHeader';
 import { BottomTabBar } from '../../src/components/BottomTabBar';
-import { MockBanner } from '../../src/components/MockBanner';
 import { FeatureFlags } from '../../src/config/features';
 import { ConversationsApi } from '../../src/api/conversations.api';
+import { OperationsApi } from '../../src/api/operations.api';
 import {
   ConversationDto,
   MessageDto,
   ProposalDto,
+  OperationDto,
   formatCOP,
+  LEGAL_CONTENT_ES,
 } from '@data-circular/shared';
+import { LegalNoticeModal } from '../../src/components/LegalNoticeModal';
+import { VerificationRequestModal } from '../../src/components/VerificationRequestModal';
 import {
   MOCK_CONVERSATIONS,
   MOCK_MESSAGES,
@@ -69,12 +73,18 @@ export default function ChatScreen() {
   // Estados de Propuestas en pestaña Propuestas
   const [mockProposals, setMockProposals] = useState<ProposalMock[]>(MOCK_PROPOSALS);
 
-  // Estados de Operaciones (Mock - Fase 11)
+  // Estados de Operaciones (Real vs Mock)
   const [operations] = useState<OperationMock[]>(MOCK_OPERATIONS);
+  const [realOperations, setRealOperations] = useState<OperationDto[]>([]);
+  const [loadingOperations, setLoadingOperations] = useState(false);
 
   // Polling intervals refs
   const pollConversationsRef = useRef<any>(null);
   const pollMessagesRef = useRef<any>(null);
+
+  // Estados de Avisos Legales y Verificación (Punto 1 y 3)
+  const [legalNoticeModalVisible, setLegalNoticeModalVisible] = useState(false);
+  const [verificationModalVisible, setVerificationModalVisible] = useState(false);
 
   // 1. Cargar Conversaciones
   const loadConversations = async (showLoading = false) => {
@@ -97,12 +107,27 @@ export default function ChatScreen() {
     }
   };
 
+  const loadOperations = async () => {
+    if (FeatureFlags.USE_MOCKS_OPERATIONS) return;
+    setLoadingOperations(true);
+    try {
+      const res = await OperationsApi.list();
+      setRealOperations(res.data);
+    } catch {
+      // Ignorar si no hay conexión
+    } finally {
+      setLoadingOperations(false);
+    }
+  };
+
   useEffect(() => {
     loadConversations(true);
+    loadOperations();
 
     // Polling de conversaciones cada 8 segundos
     pollConversationsRef.current = setInterval(() => {
       loadConversations(false);
+      loadOperations();
     }, 8000);
 
     return () => {
@@ -330,11 +355,6 @@ export default function ChatScreen() {
         curved={true}
       />
 
-      {/* Banner informativo de mock solo cuando aplica a la sección */}
-      {activeSection === 'operations' && (
-        <MockBanner moduleName="Operaciones y Trazabilidad (Fase 11)" />
-      )}
-
       {/* Selector de Sección */}
       <View style={styles.segmentedControl}>
         <TouchableOpacity
@@ -405,6 +425,33 @@ export default function ChatScreen() {
       {/* Vista 2: Propuestas Comerciales Circulares */}
       {activeSection === 'proposals' && (
         <ScrollView contentContainerStyle={styles.listContent}>
+          {/* AVISO LEGAL EN PROPUESTAS — versión completa (Bloque C1 - Punto 1) */}
+          <View style={styles.legalNoticeCard}>
+            <View style={styles.legalNoticeHeader}>
+              <Text style={styles.legalNoticeIcon}>⚖️</Text>
+              <Text style={styles.legalNoticeTitle}>
+                {LEGAL_CONTENT_ES.avisoLegalOfertasCompleto.titulo}
+              </Text>
+            </View>
+            <Text style={styles.legalNoticeText}>
+              {LEGAL_CONTENT_ES.avisoLegalOfertasCompleto.texto}
+            </Text>
+            <View style={styles.legalNoticeMeta}>
+              <Text style={styles.legalNoticeMetaText}>
+                Versión {LEGAL_CONTENT_ES.avisoLegalOfertasCompleto.version} • {LEGAL_CONTENT_ES.avisoLegalOfertasCompleto.estado}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.legalNoticeBtn}
+              onPress={() => setVerificationModalVisible(true)}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.legalNoticeBtnText}>
+                🛡️ {LEGAL_CONTENT_ES.avisoLegalOfertasCompleto.boton}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           {FeatureFlags.USE_MOCKS_PROPOSALS
             ? mockProposals.map((prop) => (
                 <View key={prop.id} style={styles.propCard}>
@@ -490,45 +537,104 @@ export default function ChatScreen() {
         </ScrollView>
       )}
 
-      {/* Vista 3: Ciclo de Operaciones y Trazabilidad (Mock - Fase 11) */}
+      {/* Vista 3: Ciclo de Operaciones y Trazabilidad (Fase 11) */}
       {activeSection === 'operations' && (
         <ScrollView contentContainerStyle={styles.listContent}>
-          {operations.map((op) => (
-            <View key={op.id} style={styles.opCard}>
-              <View style={styles.opHeader}>
-                <Text style={styles.opId}>{op.code}</Text>
-                <Text style={styles.opDate}>Total: {formatCOP(op.totalCop)}</Text>
-              </View>
-              <Text style={styles.opMaterial}>{op.materialName}</Text>
-              <Text style={styles.opRoute}>
-                📍 {op.location} • {op.partnerName}
-              </Text>
-              <View style={styles.stagesStepper}>
-                {OPERATION_STAGES.map((st: { stage: string; label: string }, idx: number) => {
-                  const isPast = idx <= OPERATION_STAGES.findIndex((s: { stage: string }) => s.stage === op.currentStage);
-                  const isCurrent = op.currentStage === st.stage;
-                  return (
-                    <View key={st.stage} style={styles.stageStep}>
-                      <View
-                        style={[
-                          styles.stageCircle,
-                          isPast && styles.stageCirclePast,
-                          isCurrent && styles.stageCircleCurrent,
-                        ]}
-                      >
-                        <Text style={[styles.stageStepNum, isPast && { color: '#FFFFFF' }]}>
-                          {idx + 1}
+          {FeatureFlags.USE_MOCKS_OPERATIONS ? (
+            operations.map((op) => (
+              <View key={op.id} style={styles.opCard}>
+                <View style={styles.opHeader}>
+                  <Text style={styles.opId}>{op.code}</Text>
+                  <Text style={styles.opDate}>Total: {formatCOP(op.totalCop)}</Text>
+                </View>
+                <Text style={styles.opMaterial}>{op.materialName}</Text>
+                <Text style={styles.opRoute}>
+                  📍 {op.location} • {op.partnerName}
+                </Text>
+                <View style={styles.stagesStepper}>
+                  {OPERATION_STAGES.map((st: { stage: string; label: string }, idx: number) => {
+                    const isPast = idx <= OPERATION_STAGES.findIndex((s: { stage: string }) => s.stage === op.currentStage);
+                    const isCurrent = op.currentStage === st.stage;
+                    return (
+                      <View key={st.stage} style={styles.stageStep}>
+                        <View
+                          style={[
+                            styles.stageCircle,
+                            isPast && styles.stageCirclePast,
+                            isCurrent && styles.stageCircleCurrent,
+                          ]}
+                        >
+                          <Text style={[styles.stageStepNum, isPast && { color: '#FFFFFF' }]}>
+                            {idx + 1}
+                          </Text>
+                        </View>
+                        <Text style={[styles.stageStepLabel, isCurrent && styles.stageStepLabelCurrent]}>
+                          {st.label}
                         </Text>
                       </View>
-                      <Text style={[styles.stageStepLabel, isCurrent && styles.stageStepLabelCurrent]}>
-                        {st.label}
-                      </Text>
-                    </View>
-                  );
-                })}
+                    );
+                  })}
+                </View>
               </View>
+            ))
+          ) : loadingOperations ? (
+            <ActivityIndicator size="large" color={Tokens.colors.primary} style={{ marginTop: 40 }} />
+          ) : realOperations.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyTitle}>Sin operaciones activas</Text>
+              <Text style={styles.emptySubtitle}>
+                Las operaciones se generarán automáticamente una vez aceptes una propuesta formal en tus negociaciones circulares.
+              </Text>
             </View>
-          ))}
+          ) : (
+            realOperations.map((op) => (
+              <View key={op.id} style={styles.opCard}>
+                <View style={styles.opHeader}>
+                  <Text style={styles.opId}>{op.code}</Text>
+                  <View
+                    style={[
+                      styles.propStatusPill,
+                      op.status === 'CLOSED'
+                        ? styles.propAccepted
+                        : op.status === 'CANCELLED'
+                        ? styles.propRejected
+                        : styles.propPending,
+                    ]}
+                  >
+                    <Text style={styles.propStatusText}>{op.status}</Text>
+                  </View>
+                </View>
+                <Text style={styles.opMaterial}>
+                  {op.quantity} {op.unitAbbreviation || 'kg'} • {op.materialCategoryName || 'Material Aprovechable'}
+                </Text>
+                <Text style={styles.opRoute}>
+                  📍 {op.pickupArea || 'Colombia'} • Contraparte: {op.seller?.displayName || op.buyer?.displayName || 'Participante'}
+                </Text>
+                {op.timeline && (
+                  <View style={styles.stagesStepper}>
+                    {op.timeline.map((step, idx) => (
+                      <View key={step.stage} style={styles.stageStep}>
+                        <View
+                          style={[
+                            styles.stageCircle,
+                            step.isDone && styles.stageCirclePast,
+                            step.isActive && styles.stageCircleCurrent,
+                          ]}
+                        >
+                          <Text style={[styles.stageStepNum, step.isDone && { color: '#FFFFFF' }]}>
+                            {idx + 1}
+                          </Text>
+                        </View>
+                        <Text style={[styles.stageStepLabel, step.isActive && styles.stageStepLabelCurrent]}>
+                          {step.label}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            ))
+          )}
         </ScrollView>
       )}
 
@@ -554,6 +660,33 @@ export default function ChatScreen() {
               showBack={true}
               onBack={handleCloseConversation}
             />
+
+            {/* AVISO LEGAL EN ENCABEZADO DE CONVERSACIÓN — versión completa (Bloque C1 - Punto 1) */}
+            <View style={[styles.legalNoticeCard, { marginHorizontal: Tokens.spacing.md, marginTop: Tokens.spacing.sm }]}>
+              <View style={styles.legalNoticeHeader}>
+                <Text style={styles.legalNoticeIcon}>⚖️</Text>
+                <Text style={styles.legalNoticeTitle}>
+                  {LEGAL_CONTENT_ES.avisoLegalOfertasCompleto.titulo}
+                </Text>
+              </View>
+              <Text style={styles.legalNoticeText}>
+                {LEGAL_CONTENT_ES.avisoLegalOfertasCompleto.texto}
+              </Text>
+              <View style={styles.legalNoticeMeta}>
+                <Text style={styles.legalNoticeMetaText}>
+                  Versión {LEGAL_CONTENT_ES.avisoLegalOfertasCompleto.version} • {LEGAL_CONTENT_ES.avisoLegalOfertasCompleto.estado}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.legalNoticeBtn}
+                onPress={() => setVerificationModalVisible(true)}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.legalNoticeBtnText}>
+                  🛡️ {LEGAL_CONTENT_ES.avisoLegalOfertasCompleto.boton}
+                </Text>
+              </TouchableOpacity>
+            </View>
 
             {/* Tarjeta Fijada de Propuesta Vigente */}
             {activeProposal && (
@@ -754,6 +887,25 @@ export default function ChatScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Modal de Aviso Legal Completo (Punto 1) */}
+      <LegalNoticeModal
+        visible={legalNoticeModalVisible}
+        onClose={() => setLegalNoticeModalVisible(false)}
+        onRequestVerification={() => {
+          setLegalNoticeModalVisible(false);
+          setVerificationModalVisible(true);
+        }}
+      />
+
+      {/* Modal de Solicitud de Verificación (Punto 3) */}
+      <VerificationRequestModal
+        visible={verificationModalVisible}
+        onClose={() => setVerificationModalVisible(false)}
+        targetUser={selectedConversation?.counterpart}
+        targetOrganization={selectedConversation?.publication?.organization}
+        defaultType="OTHER"
+      />
 
       {/* Barra de navegación inferior fija */}
       <BottomTabBar activeTab="chat" />
@@ -1264,5 +1416,59 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  legalNoticeCard: {
+    backgroundColor: Tokens.colors.brand.orangeTint,
+    borderWidth: 1,
+    borderColor: '#CBE5D5',
+    borderRadius: Tokens.radii.card,
+    padding: Tokens.spacing.md,
+    marginBottom: Tokens.spacing.md,
+  },
+  legalNoticeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  legalNoticeIcon: {
+    fontSize: 18,
+    marginRight: 6,
+  },
+  legalNoticeTitle: {
+    fontSize: 13.5,
+    fontWeight: '800',
+    color: Tokens.colors.textPrimary,
+  },
+  legalNoticeText: {
+    fontSize: 11.5,
+    lineHeight: 17,
+    color: '#263D30',
+    textAlign: 'justify',
+  },
+  legalNoticeMeta: {
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: Tokens.radii.xs,
+    alignSelf: 'flex-start',
+    marginVertical: 8,
+  },
+  legalNoticeMetaText: {
+    fontSize: 9.5,
+    color: Tokens.colors.textPrimary,
+    fontWeight: '600',
+  },
+  legalNoticeBtn: {
+    backgroundColor: Tokens.colors.brand.orangeStrong,
+    borderRadius: Tokens.radii.pill,
+    paddingVertical: 9,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  legalNoticeBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 12,
   },
 });

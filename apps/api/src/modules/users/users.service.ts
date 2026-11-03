@@ -8,6 +8,7 @@ import {
 } from '@data-circular/shared';
 import { AuthError } from '../auth/auth.service';
 import { hashPassword } from '../../utils/hash';
+import { prisma } from '../../database/prisma';
 
 export class UsersService {
   async listUsers(): Promise<SafeUserDto[]> {
@@ -88,9 +89,32 @@ export class UsersService {
       throw new AuthError('USER_NOT_FOUND', 'Usuario no encontrado o inactivo', 404);
     }
 
+    if (input.transportCategoryIds !== undefined) {
+      if (user.userType !== 'TRANSPORTER') {
+        throw new AuthError(
+          'TRANSPORT_CATEGORIES_NOT_ALLOWED',
+          'Solo los transportistas pueden configurar los materiales que su vehículo puede transportar',
+          403
+        );
+      }
+
+      const categories = await prisma.materialCategory.findMany({
+        where: { id: { in: input.transportCategoryIds }, active: true, parentId: { not: null } },
+        select: { id: true },
+      });
+      if (categories.length !== new Set(input.transportCategoryIds).size) {
+        throw new AuthError(
+          'INVALID_TRANSPORT_CATEGORY',
+          'Selecciona únicamente subcategorías activas de materiales',
+          400
+        );
+      }
+    }
+
     return usersRepository.update(userId, {
       fullName: input.fullName,
       phone: input.phone,
+      transportCategoryIds: input.transportCategoryIds,
     });
   }
 

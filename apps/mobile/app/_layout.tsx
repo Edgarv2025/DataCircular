@@ -42,6 +42,12 @@ export default function RootLayout() {
               headerShown: false,
             }}
           />
+          <Stack.Screen
+            name="verify/[code]"
+            options={{
+              headerShown: false,
+            }}
+          />
         </Stack>
       </AuthProvider>
     </SafeAreaProvider>

@@ -6,7 +6,6 @@ import { usersRepository } from '../src/modules/users/users.repository';
 import { catalogRepository } from '../src/modules/catalog/catalog.repository';
 import { publicationsRepository } from '../src/modules/publications/publications.repository';
 import { organizationsRepository } from '../src/modules/organizations/organizations.repository';
-import { MATCH_THRESHOLD } from '../src/modules/matches/matches.service';
 
 describe('Fase 9: Búsqueda, Filtros y Motor de Coincidencias (/api/v1/publications y /api/v1/matches)', () => {
   const ts = Date.now();
@@ -20,6 +19,7 @@ describe('Fase 9: Búsqueda, Filtros y Motor de Coincidencias (/api/v1/publicati
   let user2Id: string;
   let tokenAdmin: string;
   let adminId: string;
+  let offerPet500Id: string;
 
   let parentPlasticId: string;
   let subcatPetId: string;
@@ -51,14 +51,15 @@ describe('Fase 9: Búsqueda, Filtros y Motor de Coincidencias (/api/v1/publicati
     if (!kg) throw new Error('Unidad kg no encontrada en seed');
     unitKgId = kg.id;
 
-    // 2. Registrar Usuario 1 (Empresa Transformadora con Organización)
+    // 2. Registrar Usuario 1 (Generador con Organización)
     const resUser1 = await request(app)
       .post('/api/v1/auth/register')
       .send({
         email: `empresa.f9.${ts}@imara.org.co`,
         password: 'Password123!',
         fullName: 'Empresa Transformadora F9',
-        userType: 'TRANSFORMER',
+        phone: '+57 310 000 0003',
+        userType: 'GENERATOR',
         dataPolicyAccepted: true,
       });
     tokenUser1 = resUser1.body.data.tokens.accessToken;
@@ -72,12 +73,25 @@ describe('Fase 9: Búsqueda, Filtros y Motor de Coincidencias (/api/v1/publicati
         email: `reciclador.f9.${ts}@imara.org.co`,
         password: 'Password123!',
         fullName: 'Reciclador Suba F9',
+        phone: '+57 310 000 0004',
         userType: 'RECYCLER',
         dataPolicyAccepted: true,
       });
     tokenUser2 = resUser2.body.data.tokens.accessToken;
     user2Id = resUser2.body.data.user.id;
     createdUserIds.push(user2Id);
+
+    const recyclerOrg = await request(app)
+      .post('/api/v1/organizations')
+      .set('Authorization', `Bearer ${tokenUser2}`)
+      .send({
+        name: `Recicladora coincidencias ${ts}`,
+        orgType: 'COOPERATIVE',
+        activityType: 'RECYCLER',
+        materialCategoryIds: [subcatPetId],
+      });
+    expect(recyclerOrg.status).toBe(201);
+    createdOrgIds.push(recyclerOrg.body.data.id);
 
     // 4. Crear Administrador de Plataforma
     const resAdmin = await request(app)
@@ -86,6 +100,7 @@ describe('Fase 9: Búsqueda, Filtros y Motor de Coincidencias (/api/v1/publicati
         email: `admin.f9.${ts}@imara.org.co`,
         password: 'Password123!',
         fullName: 'Admin F9',
+        phone: '+57 310 000 0005',
         userType: 'GENERATOR',
         dataPolicyAccepted: true,
       });
@@ -175,8 +190,8 @@ describe('Fase 9: Búsqueda, Filtros y Motor de Coincidencias (/api/v1/publicati
           locationArea: 'Fontibón',
           isUrgent: false,
         });
-      pubNeedAluminio = p3.body.data.id;
-      createdPublicationIds.push(pubNeedAluminio);
+      expect(p3.status).toBe(403);
+      pubNeedAluminio = '';
 
       // Publicación 4: OFFER Expirada de Usuario 1
       const p4 = await request(app)
@@ -199,7 +214,7 @@ describe('Fase 9: Búsqueda, Filtros y Motor de Coincidencias (/api/v1/publicati
     it('1.1 Búsqueda sin filtros devuelve solo publicaciones ACTIVE y paginadas', async () => {
       const res = await request(app)
         .get('/api/v1/publications/search')
-        .set('Authorization', `Bearer ${tokenUser2}`);
+        .set('Authorization', `Bearer ${tokenUser1}`)
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
@@ -221,7 +236,7 @@ describe('Fase 9: Búsqueda, Filtros y Motor de Coincidencias (/api/v1/publicati
     it('1.2 Filtro por categoría padre incluye automáticamente los resultados de sus subcategorías', async () => {
       const res = await request(app)
         .get(`/api/v1/publications/search?categoryId=${parentPlasticId}`)
-        .set('Authorization', `Bearer ${tokenUser2}`);
+        .set('Authorization', `Bearer ${tokenUser1}`)
 
       expect(res.status).toBe(200);
       const items = res.body.data.data;
@@ -240,7 +255,7 @@ describe('Fase 9: Búsqueda, Filtros y Motor de Coincidencias (/api/v1/publicati
     it('1.3 Filtro por subcategoría exacta devuelve únicamente publicaciones de dicha subcategoría', async () => {
       const res = await request(app)
         .get(`/api/v1/publications/search?categoryId=${subcatPetId}`)
-        .set('Authorization', `Bearer ${tokenUser2}`);
+        .set('Authorization', `Bearer ${tokenUser1}`)
 
       expect(res.status).toBe(200);
       const items = res.body.data.data;
@@ -251,7 +266,7 @@ describe('Fase 9: Búsqueda, Filtros y Motor de Coincidencias (/api/v1/publicati
     it('1.4 Filtros combinados: tipo, ciudad, localidad y rango de cantidad', async () => {
       const res = await request(app)
         .get('/api/v1/publications/search?type=OFFER&area=Fontib%C3%B3n&minQuantity=400&maxQuantity=600')
-        .set('Authorization', `Bearer ${tokenUser2}`);
+        .set('Authorization', `Bearer ${tokenUser1}`)
 
       expect(res.status).toBe(200);
       const items = res.body.data.data;
@@ -268,7 +283,7 @@ describe('Fase 9: Búsqueda, Filtros y Motor de Coincidencias (/api/v1/publicati
     it('1.5 Ordenamiento prioritario por publicaciones urgentes (sortBy=urgent_first)', async () => {
       const res = await request(app)
         .get(`/api/v1/publications/search?categoryId=${parentPlasticId}&sortBy=urgent_first`)
-        .set('Authorization', `Bearer ${tokenUser2}`);
+        .set('Authorization', `Bearer ${tokenUser1}`)
 
       expect(res.status).toBe(200);
       const items = res.body.data.data;
@@ -304,10 +319,6 @@ describe('Fase 9: Búsqueda, Filtros y Motor de Coincidencias (/api/v1/publicati
   });
 
   describe('2. Motor de Coincidencias y Scoring (GET /api/v1/publications/:id/matches)', () => {
-    let offerPet500Id: string;
-    let needPet300FontibonId: string;
-    let needAluminioSubaId: string;
-
     beforeAll(async () => {
       // OFERTA: 500 kg PET en Fontibón, Bogotá D.C. (Usuario 1)
       const off = await request(app)
@@ -342,8 +353,7 @@ describe('Fase 9: Búsqueda, Filtros y Motor de Coincidencias (/api/v1/publicati
           locationArea: 'Fontibón',
           isUrgent: false,
         });
-      needPet300FontibonId = needStrong.body.data.id;
-      createdPublicationIds.push(needPet300FontibonId);
+      expect(needStrong.status).toBe(403);
 
       // NECESIDAD DÉBIL: 1000 kg Aluminio en Suba (Usuario 2)
       // Solo comparte ciudad (+20), reciente (+5) = 25 puntos (< 40 umbral)
@@ -360,71 +370,56 @@ describe('Fase 9: Búsqueda, Filtros y Motor de Coincidencias (/api/v1/publicati
           locationArea: 'Suba',
           isUrgent: false,
         });
-      needAluminioSubaId = needWeak.body.data.id;
-      createdPublicationIds.push(needAluminioSubaId);
+      expect(needWeak.status).toBe(403);
     });
 
-    it('2.1 Retorna candidatos del tipo opuesto que superan el umbral mínimo (40 puntos)', async () => {
+    it('2.1 No genera matches entre ofertas sin una publicación de demanda', async () => {
       const res = await request(app)
         .get(`/api/v1/publications/${offerPet500Id}/matches`)
-        .set('Authorization', `Bearer ${tokenUser1}`);
+        .set('Authorization', `Bearer ${tokenUser1}`)
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       const matches = res.body.data;
       expect(Array.isArray(matches)).toBe(true);
 
-      // La necesidad fuerte debe estar presente
-      const strongMatch = matches.find((m: any) => m.publicationId === needPet300FontibonId);
-      expect(strongMatch).toBeDefined();
-      expect(strongMatch.score).toBeGreaterThanOrEqual(MATCH_THRESHOLD);
+      expect(matches).toEqual([]);
     });
 
-    it('2.2 Excluye candidatos débiles que quedan por debajo del umbral de 40 puntos', async () => {
+    it('2.2 No retorna publicaciones de necesidad como matches', async () => {
       const res = await request(app)
         .get(`/api/v1/publications/${offerPet500Id}/matches`)
-        .set('Authorization', `Bearer ${tokenUser1}`);
+        .set('Authorization', `Bearer ${tokenUser1}`)
 
       expect(res.status).toBe(200);
       const matches = res.body.data;
 
-      // La necesidad de Aluminio no debe aparecer (puntaje ~25 < 40)
-      const weakMatch = matches.find((m: any) => m.publicationId === needAluminioSubaId);
-      expect(weakMatch).toBeUndefined();
+      expect(matches).toEqual([]);
     });
 
-    it('2.3 Coincidencia bidireccional: la OFFER aparece en los matches de la NEED', async () => {
+    it('2.3 La bandeja de un recolector devuelve la oferta de su categoría elegida', async () => {
       const res = await request(app)
-        .get(`/api/v1/publications/${needPet300FontibonId}/matches`)
-        .set('Authorization', `Bearer ${tokenUser2}`);
+        .get('/api/v1/matches/my-suggestions')
+        .set('Authorization', `Bearer ${tokenUser2}`)
 
       expect(res.status).toBe(200);
       const matches = res.body.data;
-      const reciprocalMatch = matches.find((m: any) => m.publicationId === offerPet500Id);
-      expect(reciprocalMatch).toBeDefined();
-      expect(reciprocalMatch.score).toBeGreaterThanOrEqual(MATCH_THRESHOLD);
+      expect(matches.map((publication: any) => publication.id)).toContain(offerPet500Id);
+      expect(matches.every((publication: any) => publication.type === 'OFFER')).toBe(true);
     });
 
-    it('2.4 Desglose de factores auditable en lenguaje claro (HU-08)', async () => {
+    it('2.4 Las ofertas no generan matches oferta-contra-oferta', async () => {
       const res = await request(app)
         .get(`/api/v1/publications/${offerPet500Id}/matches`)
-        .set('Authorization', `Bearer ${tokenUser1}`);
+        .set('Authorization', `Bearer ${tokenUser1}`)
 
-      const strongMatch = res.body.data.find((m: any) => m.publicationId === needPet300FontibonId);
-      expect(strongMatch).toBeDefined();
-      expect(Array.isArray(strongMatch.factors)).toBe(true);
-
-      // Factores esperados
-      expect(strongMatch.factors).toContain('Misma subcategoría de material');
-      expect(strongMatch.factors).toContain('Misma localidad o zona geográfica');
-      expect(strongMatch.factors).toContain('Cantidad ofrecida cubre la cantidad solicitada');
-      expect(strongMatch.factors).toContain('Publicación candidata creada en los últimos 7 días');
+      expect(res.body.data).toEqual([]);
     });
 
     it('2.5 Detalle de publicación (GET /:id) incluye contador liviano publicacionesCompatibles', async () => {
       const res = await request(app)
         .get(`/api/v1/publications/${offerPet500Id}`)
-        .set('Authorization', `Bearer ${tokenUser1}`);
+        .set('Authorization', `Bearer ${tokenUser1}`)
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
@@ -434,7 +429,7 @@ describe('Fase 9: Búsqueda, Filtros y Motor de Coincidencias (/api/v1/publicati
   });
 
   describe('3. Bandeja de Sugerencias para el Usuario (GET /api/v1/matches/my-suggestions)', () => {
-    it('3.1 Retorna resultados agregados para las publicaciones activas del usuario con límite de 5 matches', async () => {
+    it('3.1 Devuelve ofertas coincidentes según los materiales asociados al usuario', async () => {
       const res = await request(app)
         .get('/api/v1/matches/my-suggestions')
         .set('Authorization', `Bearer ${tokenUser1}`);
@@ -445,12 +440,14 @@ describe('Fase 9: Búsqueda, Filtros y Motor de Coincidencias (/api/v1/publicati
       expect(Array.isArray(suggestions)).toBe(true);
 
       for (const item of suggestions) {
-        expect(item).toHaveProperty('publicationId');
-        expect(item).toHaveProperty('publication');
-        expect(item).toHaveProperty('matches');
-        expect(Array.isArray(item.matches)).toBe(true);
-        expect(item.matches.length).toBeLessThanOrEqual(5);
+        expect(item.type).toBe('OFFER');
       }
+
+      const recyclerSuggestions = await request(app)
+        .get('/api/v1/matches/my-suggestions')
+        .set('Authorization', `Bearer ${tokenUser2}`);
+      expect(recyclerSuggestions.status).toBe(200);
+      expect(recyclerSuggestions.body.data.map((publication: any) => publication.id)).toContain(offerPet500Id);
     });
   });
 });

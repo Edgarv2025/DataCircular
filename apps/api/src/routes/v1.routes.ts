@@ -7,6 +7,8 @@ import { catalogRouter } from '../modules/catalog/catalog.routes';
 import { publicationsRouter } from '../modules/publications/publications.routes';
 import { matchesRouter } from '../modules/matches/matches.routes';
 import { conversationsRouter, proposalsRouter } from '../modules/conversations/conversations.routes';
+import { operationsRouter } from '../modules/operations/operations.routes';
+import { adminRouter } from '../modules/admin/admin.routes';
 
 const v1Router = Router();
 
@@ -37,5 +39,10 @@ v1Router.use('/conversations', conversationsRouter);
 // Módulo de Propuestas y Negociaciones (Fase 10)
 v1Router.use('/proposals', proposalsRouter);
 
-export { v1Router };
+// Módulo de Operaciones y Logística (Fase 11)
+v1Router.use('/operations', operationsRouter);
 
+// Módulo de Administración, Auditoría y Reportes (Fase 12)
+v1Router.use('/admin', adminRouter);
+
+export { v1Router };

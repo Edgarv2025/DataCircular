@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { verifyAccessToken } from '../utils/jwt';
 import { usersRepository } from '../modules/users/users.repository';
 import { sendError } from '../utils/apiResponse';
-import { SafeUserDto, UserRole } from '@data-circular/shared';
+import { SafeUserDto, UserRole, UserType } from '@data-circular/shared';
 
 // Extender la interfaz Request de Express para incluir el usuario autenticado
 declare global {
@@ -83,6 +83,26 @@ export function requireRole(allowedRoles: UserRole | UserRole[]) {
         'No tienes permisos suficientes para realizar esta acción administrativa',
         403
       );
+      return;
+    }
+
+    next();
+  };
+}
+
+/**
+ * Restringe una ruta al tipo de participante indicado; ADMIN conserva acceso total.
+ */
+export function requireUserType(allowedTypes: UserType | UserType[]) {
+  const types = Array.isArray(allowedTypes) ? allowedTypes : [allowedTypes];
+  return (req: Request, res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      sendError(res, 'UNAUTHORIZED', 'No autenticado', 401);
+      return;
+    }
+
+    if (req.user.role !== 'ADMIN' && !types.includes(req.user.userType)) {
+      sendError(res, 'FORBIDDEN', 'Tu tipo de usuario no tiene acceso a esta acción', 403);
       return;
     }
 

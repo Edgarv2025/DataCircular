@@ -6,8 +6,9 @@ import {
   CreateCategoryInput,
   UpdateCategoryInput,
   CreateUnitInput,
+  UpdateUnitInput,
 } from '@data-circular/shared';
-import { seedCatalogAndUnits } from './catalog.seed';
+import { catalogNeedsSeeding, seedCatalogAndUnits } from './catalog.seed';
 
 export function toCategoryDto(
   cat: MaterialCategory & {
@@ -43,10 +44,21 @@ export function toUnitDto(unit: Unit): UnitDto {
 }
 
 export class CatalogRepository {
+  private seeding: Promise<void> | null = null;
+
   async ensureSeeded(): Promise<void> {
-    const count = await prisma.materialCategory.count();
-    if (count === 0) {
-      await seedCatalogAndUnits();
+    if (!this.seeding) {
+      this.seeding = (async () => {
+        if (await catalogNeedsSeeding()) {
+          await seedCatalogAndUnits();
+        }
+      })();
+    }
+
+    try {
+      await this.seeding;
+    } finally {
+      this.seeding = null;
     }
   }
 
@@ -133,6 +145,26 @@ export class CatalogRepository {
     return toCategoryDto(category);
   }
 
+  async deactivateCategoryTree(id: string): Promise<void> {
+    const pendingIds = [id];
+    const visitedIds: string[] = [];
+
+    while (pendingIds.length > 0) {
+      const currentIds = pendingIds.splice(0, pendingIds.length);
+      visitedIds.push(...currentIds);
+      const children = await prisma.materialCategory.findMany({
+        where: { parentId: { in: currentIds } },
+        select: { id: true },
+      });
+      pendingIds.push(...children.map(({ id: childId }) => childId));
+    }
+
+    await prisma.materialCategory.updateMany({
+      where: { id: { in: visitedIds } },
+      data: { active: false },
+    });
+  }
+
   async listUnits(activeOnly = true): Promise<UnitDto[]> {
     await this.ensureSeeded();
 
@@ -170,6 +202,28 @@ export class CatalogRepository {
         abbreviation: input.abbreviation.trim(),
         active: input.active !== undefined ? input.active : true,
       },
+    });
+
+    return toUnitDto(unit);
+  }
+
+  async updateUnit(id: string, input: UpdateUnitInput): Promise<UnitDto> {
+    const unit = await prisma.unit.update({
+      where: { id },
+      data: {
+        ...(input.name !== undefined ? { name: input.name.trim() } : {}),
+        ...(input.abbreviation !== undefined ? { abbreviation: input.abbreviation.trim() } : {}),
+        ...(input.active !== undefined ? { active: input.active } : {}),
+      },
+    });
+
+    return toUnitDto(unit);
+  }
+
+  async deactivateUnit(id: string): Promise<UnitDto> {
+    const unit = await prisma.unit.update({
+      where: { id },
+      data: { active: false },
     });
 
     return toUnitDto(unit);

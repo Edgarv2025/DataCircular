@@ -46,7 +46,7 @@ export const MOCK_CONVERSATIONS: ConversationMock[] = [
     publicationId: 'pub-aluminio-2',
     publicationTitle: '300 kg Latas de Aluminio Compactadas',
     participantName: 'BioTransformar SAS',
-    participantOrg: 'Transformadora Distrital',
+    participantOrg: 'Transformadora Nacional',
     lastMessage: 'Propuesta aceptada: acordamos el pesaje en báscula certificada.',
     lastMessageTime: 'Ayer',
     unreadCount: 0,

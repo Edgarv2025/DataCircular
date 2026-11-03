@@ -31,4 +31,12 @@ export const Colors = {
   chipActive: Tokens.colors.chipActive,
   surfaceAlt: Tokens.colors.surfaceAlt,
   textOnDark: Tokens.colors.textOnDark,
+
+  // Bloque A3 - Identidad de Marca y Contraste WCAG AA
+  brand: Tokens.colors.brand,
+  brandOrange: Tokens.colors.brand.orange,
+  brandOrangeStrong: Tokens.colors.brand.orangeStrong,
+  brandOrangeDark: Tokens.colors.brand.orangeDark,
+  brandOrangeTint: Tokens.colors.brand.orangeTint,
+  brandTextOnOrange: Tokens.colors.brand.textOnOrange,
 };

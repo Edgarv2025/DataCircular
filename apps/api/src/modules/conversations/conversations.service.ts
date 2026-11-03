@@ -17,6 +17,7 @@ import {
 } from './conversations.repository';
 import { publicationsRepository } from '../publications/publications.repository';
 import { organizationsRepository } from '../organizations/organizations.repository';
+import { operationsRepository } from '../operations/operations.repository';
 
 export class ConversationError extends Error {
   constructor(
@@ -118,6 +119,14 @@ export class ConversationsService {
           400
         );
       }
+    }
+
+    if (user.role !== 'ADMIN' && user.userType === 'GENERATOR') {
+      throw new ConversationError(
+        'FORBIDDEN',
+        'Los generadores solo pueden responder conversaciones sobre sus propias publicaciones',
+        403
+      );
     }
 
     // Validar estado de la publicación
@@ -558,6 +567,13 @@ export class ConversationsService {
         'La propuesta ya fue procesada concurrentemente',
         409
       );
+    }
+
+    // Auto-generar operación de economía circular y logística (Fase 11)
+    try {
+      await operationsRepository.createFromProposal(proposal.id);
+    } catch {
+      // Si ya existía o ocurre algún conflicto de concurrencia, continuar fluidamente
     }
 
     return toProposalDto(accepted, user.id);

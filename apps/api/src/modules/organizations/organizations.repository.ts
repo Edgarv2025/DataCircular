@@ -20,7 +20,10 @@ import {
 import { seedSystemRolesAndPermissions } from './organizations.seed';
 
 export function toOrganizationDto(
-  org: Organization & { _count?: { members: number } },
+  org: Organization & {
+    _count?: { members: number };
+    materialCategories?: { categoryId: string }[];
+  },
   userRole?: string
 ): OrganizationDto {
   return {
@@ -40,6 +43,7 @@ export function toOrganizationDto(
     verifiedAt: org.verifiedAt ? org.verifiedAt.toISOString() : null,
     verificationNotes: org.verificationNotes,
     certificateUrl: org.certificateUrl,
+    materialCategoryIds: org.materialCategories?.map(({ categoryId }) => categoryId) || [],
     createdAt: org.createdAt.toISOString(),
     updatedAt: org.updatedAt.toISOString(),
     deletedAt: org.deletedAt ? org.deletedAt.toISOString() : null,
@@ -164,7 +168,11 @@ export class OrganizationsRepository {
           city: input.city || 'Bogotá D.C.',
           status: OrganizationStatus.ACTIVE,
           verificationStatus: VerificationStatus.UNVERIFIED,
+          materialCategories: {
+            create: (input.materialCategoryIds || []).map((categoryId) => ({ categoryId })),
+          },
         },
+        include: { materialCategories: true },
       });
 
       await tx.organizationMember.create({
@@ -193,6 +201,7 @@ export class OrganizationsRepository {
         _count: {
           select: { members: true },
         },
+        materialCategories: { select: { categoryId: true } },
       },
     });
 
@@ -245,6 +254,7 @@ export class OrganizationsRepository {
             _count: {
               select: { members: true },
             },
+            materialCategories: { select: { categoryId: true } },
           },
         },
       },
@@ -277,6 +287,7 @@ export class OrganizationsRepository {
         _count: {
           select: { members: true },
         },
+        materialCategories: { select: { categoryId: true } },
       },
       orderBy: { createdAt: 'desc' },
     });

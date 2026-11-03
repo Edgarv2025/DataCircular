@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { matchesService } from './matches.service';
 import { sendSuccess, sendError } from '../../utils/apiResponse';
-import { PublicationError } from '../publications/publications.service';
+import { PublicationError, publicationsService } from '../publications/publications.service';
 
 export class MatchesController {
   /**
@@ -10,8 +10,13 @@ export class MatchesController {
    */
   async getMatches(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
+      const target = await publicationsService.getPublicationById(req.params.id, req.user!);
       const matches = await matchesService.getMatchesForPublication(req.params.id);
-      sendSuccess(res, matches, 'Coincidencias obtenidas exitosamente');
+      const visibleMatches =
+        req.user!.userType === 'GENERATOR' && target.ownerUserId !== req.user!.id
+          ? []
+          : matches;
+      sendSuccess(res, visibleMatches, 'Coincidencias obtenidas exitosamente');
     } catch (err: unknown) {
       if (err instanceof PublicationError) {
         sendError(res, err.code, err.message, err.statusCode);
@@ -27,6 +32,10 @@ export class MatchesController {
    */
   async getMySuggestions(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
+      if (req.user!.role !== 'USER' || req.user!.userType === 'GENERATOR') {
+        sendSuccess(res, [], 'No hay sugerencias para este tipo de usuario');
+        return;
+      }
       const suggestions = await matchesService.getMySuggestions(req.user!);
       sendSuccess(res, suggestions, 'Bandeja de sugerencias obtenida exitosamente');
     } catch (err) {

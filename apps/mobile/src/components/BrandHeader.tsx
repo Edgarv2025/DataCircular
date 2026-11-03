@@ -1,4 +1,5 @@
 import React from 'react';
+import { useRouter } from 'expo-router';
 import {
   StyleSheet,
   Text,
@@ -8,7 +9,17 @@ import {
   Platform,
   StatusBar,
 } from 'react-native';
+import { UserType } from '@data-circular/shared';
+import { useAuth } from '../context/AuthContext';
 import { Tokens } from '../theme/tokens';
+import { getHomeRoute } from '../navigation';
+
+const USER_TYPE_LABELS: Record<UserType, string> = {
+  GENERATOR: 'Generador',
+  RECYCLER: 'Reciclador',
+  TRANSPORTER: 'Transportador',
+  TRANSFORMER: 'Transformador',
+};
 
 interface BrandHeaderProps {
   title?: string;
@@ -16,6 +27,7 @@ interface BrandHeaderProps {
   showBack?: boolean;
   onBack?: () => void;
   rightAction?: React.ReactNode;
+  showHome?: boolean;
   curved?: boolean;
   style?: ViewStyle;
 }
@@ -30,10 +42,14 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({
   showBack = false,
   onBack,
   rightAction,
+  showHome = true,
   curved = true,
   style,
 }) => {
+  const { user } = useAuth();
+  const router = useRouter();
   const paddingTop = Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 12 : 52;
+  const homeRoute = getHomeRoute(user);
 
   return (
     <View
@@ -51,6 +67,8 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({
               onPress={onBack}
               style={styles.backButton}
               activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Volver a la pantalla anterior"
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
               <Text style={styles.backText}>‹</Text>
@@ -67,9 +85,28 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({
               {subtitle}
             </Text>
           ) : null}
+          {user ? (
+            <Text style={styles.userIdentity} numberOfLines={2}>
+              {user.role === 'ADMIN'
+                ? 'Perfil: Administrador'
+                : `Perfil: Usuario\nTipo: ${USER_TYPE_LABELS[user.userType]}`}
+            </Text>
+          ) : null}
         </View>
 
         <View style={styles.rightSlot}>
+          {showHome ? (
+            <TouchableOpacity
+              onPress={() => router.replace(homeRoute)}
+              style={styles.homeButton}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Ir a Inicio"
+            >
+              <Text style={styles.homeIcon}>⌂</Text>
+              <Text style={styles.homeText}>Inicio</Text>
+            </TouchableOpacity>
+          ) : null}
           {rightAction || null}
         </View>
       </View>
@@ -136,9 +173,39 @@ const styles = StyleSheet.create({
     marginTop: 2,
     textAlign: 'center',
   },
+  userIdentity: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    lineHeight: 14,
+    marginTop: 4,
+    textAlign: 'center',
+  },
   rightSlot: {
-    width: 44,
+    minWidth: 44,
+    flexDirection: 'row',
+    gap: 6,
     justifyContent: 'center',
     alignItems: 'flex-end',
+  },
+  homeButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  homeIcon: {
+    fontSize: 16,
+    lineHeight: 18,
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  homeText: {
+    fontSize: 9,
+    lineHeight: 11,
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
 });

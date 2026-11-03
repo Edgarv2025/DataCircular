@@ -56,6 +56,8 @@ Registra un nuevo usuario en la plataforma.
 
 `userType` es obligatorio y acepta `GENERATOR`, `RECYCLER`, `TRANSPORTER` o `TRANSFORMER`. `dataPolicyAccepted` debe ser `true`; la aceptación queda registrada con usuario, fecha, versión, URL configurada (si existe) y estado. El rol de acceso no se puede elegir en el registro público: siempre se asigna `USER`.
 
+Solo los generadores publican y administran ofertas (`OFFER`). Los perfiles reciclador, transportador y transformador seleccionan las categorías de material que reciben al crear su organización y consultan las ofertas coincidentes; no publican demandas (`NEED`). Estos tres perfiles comparten las funciones operativas de recolección. Las partes de una coincidencia pueden solicitar o retirar el transporte desde el detalle. El administrador solo accede a funciones administrativas: no publica, busca materiales ni participa en conversaciones.
+
 ### `GET /api/v1/auth/data-policy`
 Devuelve disponibilidad, URL y versión configuradas para la política. Configura `DATA_POLICY_URL` con cualquier URL válida cuando la referencia oficial esté disponible; si queda vacía, la API informa `available: false` y `url: null`.
 
@@ -224,6 +226,8 @@ Consulta el catálogo de roles del sistema (`OWNER`, `ADMIN`, `MEMBER`, `OPERATO
 
 ### `POST /api/v1/organizations`
 Registra una nueva empresa, asociación, fundación o cooperativa en Bogotá D.C. El usuario creador queda automáticamente vinculado como `OWNER`.
+- **Acceso**: Usuarios operativos (`role: USER`); los administradores de plataforma no crean organizaciones.
+- **Materiales**: Los perfiles `RECYCLER`, `TRANSPORTER` y `TRANSFORMER` deben enviar al menos un `materialCategoryIds` con subcategorías activas del catálogo para recibir ofertas coincidentes. No se requiere para `GENERATOR`.
 - **Acceso**: Privado (`Authorization: Bearer <accessToken>`).
 - **Body**:
 ```json
@@ -237,7 +241,8 @@ Registra una nueva empresa, asociación, fundación o cooperativa en Bogotá D.C
   "phone": "+57 310 999 8877",
   "address": "Carrera 68 # 19-45",
   "locality": "Puente Aranda",
-  "city": "Bogotá D.C."
+  "city": "Bogotá D.C.",
+  "materialCategoryIds": ["770e8400-e29b-41d4-a716-446655440002"]
 }
 ```
 
@@ -290,6 +295,7 @@ Aprueba (`VERIFIED`) o rechaza (`REJECTED`) una solicitud de certificación inst
 
 ### `GET /api/v1/catalog/categories`
 Consulta el árbol completo de categorías y subcategorías de materiales aprovechables.
+- **Administración**: `ADMIN` puede incluir elementos inactivos con `?includeInactive=true`.
 - **Acceso**: Privado (`Authorization: Bearer <accessToken>`).
 
 ### `GET /api/v1/catalog/categories/:id`
@@ -305,8 +311,12 @@ Crea una nueva categoría raíz o subcategoría (requiere `parentId` existente).
 Actualiza nombre, descripción, estado activo o pertenencia jerárquica de una categoría.
 - **Acceso**: Exclusivo administradores (`requireRole('ADMIN')`).
 
+### `DELETE /api/v1/catalog/categories/:id`
+Desactiva lógicamente una categoría y sus subcategorías. Las referencias históricas se conservan; un administrador puede restaurar elementos editando su estado `active`.
+
 ### `GET /api/v1/catalog/units`
 Lista todas las unidades de medida activas para cuantificar materiales (kg, ton, und, l, m3, bulto).
+- **Administración**: `ADMIN` puede incluir unidades inactivas con `?includeInactive=true`.
 - **Acceso**: Privado (`Authorization: Bearer <accessToken>`).
 
 ### `POST /api/v1/catalog/units`
@@ -314,14 +324,21 @@ Registra una nueva unidad de medida estandarizada.
 - **Acceso**: Exclusivo administradores (`requireRole('ADMIN')`).
 - **Body**: `{ "name": "Galón", "abbreviation": "gal" }`.
 
+### `PATCH /api/v1/catalog/units/:id` y `DELETE /api/v1/catalog/units/:id`
+Actualiza una unidad o la desactiva lógicamente; las referencias históricas se conservan.
+
 ---
 
-## 6. Módulo de Publicaciones de Oferta y Demanda (`/api/v1/publications`)
+## 6. Módulo de Publicaciones de Oferta (`/api/v1/publications`)
 
 ### `POST /api/v1/publications`
-Crea una oferta (`OFFER`) o necesidad (`NEED`) de material aprovechable.
+Crea una oferta (`OFFER`) de material aprovechable.
+- **Acceso**: Solo usuarios operativos (`role: USER`).
+- **Regla por perfil**: Solo `GENERATOR` puede crear ofertas. Las solicitudes de tipo `NEED` se rechazan; el administrador y los perfiles recolectores no pueden publicar.
+- **Transporte**: `requiresTransport` no se activa al crear la publicación; solo las partes pueden cambiarlo después de que exista una coincidencia.
 - **Acceso**: Privado (`Authorization: Bearer <accessToken>`).
 - **Regla de negocio**: `categoryId` debe ser obligatoriamente una subcategoría hoja (`parent_id` no nulo). Si se publica a nombre de una organización, el usuario debe ser miembro activo.
+- `photoUrl` es opcional y acepta una URL o una imagen local como URI `data:image/...;base64,...` de hasta 3 MB.
 - **Body**:
 ```json
 {
@@ -342,15 +359,17 @@ Crea una oferta (`OFFER`) o necesidad (`NEED`) de material aprovechable.
 
 ### `GET /api/v1/publications/:id`
 Obtiene el detalle completo de una publicación, incluyendo categoría, unidad, datos de contacto públicos del emisor y el contador liviano de coincidencias potenciales `publicacionesCompatibles`. Si `expiresAt` está en el pasado, el estado se evalúa dinámicamente como `EXPIRED`.
+- Generadores consultan sus propias publicaciones; los demás perfiles operativos pueden consultar publicaciones activas. El administrador usa únicamente los endpoints administrativos.
 - **Acceso**: Privado (`Authorization: Bearer <accessToken>`).
 
 ### `PATCH /api/v1/publications/:id`
 Modifica cantidad, ubicación, condición, foto o vigencia de una publicación.
-- **Acceso**: Privado (solo el dueño `ownerUserId`, miembros autorizados de la organización o administradores globales).
+- **Acceso**: Privado (el dueño puede editar; el administrador no actúa como participante).
+- Las partes de una coincidencia pueden actualizar exclusivamente `requiresTransport`; los demás campos solo los modifica el dueño.
 
 ### `DELETE /api/v1/publications/:id`
 Cierra o elimina lógicamente una publicación (`status: CLOSED`, `deletedAt: Timestamp`).
-- **Acceso**: Privado (solo dueño o miembro autorizado).
+- **Acceso**: Privado (solo el dueño; el administrador no actúa como publicador).
 
 ### `GET /api/v1/publications/mine`
 Lista las publicaciones propias creadas por el usuario autenticado con soporte de paginación simple (`?page=1&limit=20`).
@@ -366,10 +385,11 @@ Listado general de publicaciones activas con paginación simple (`?page=1&limit=
 
 ### `GET /api/v1/publications/search`
 Búsqueda avanzada de publicaciones con filtros combinables, resolución de jerarquía de categorías y reglas de visibilidad.
+- Solo usuarios operativos; el administrador no participa en la búsqueda.
 
 - **Acceso**: Privado (`Authorization: Bearer <accessToken>`).
 - **Parámetros de consulta (Query Parameters)**:
-  - `type`: `OFFER` \| `NEED` (opcional).
+  - `type`: únicamente `OFFER`; las solicitudes de `NEED` no devuelven resultados.
   - `categoryId`: UUID (opcional). Si corresponde a una categoría padre, incluye automáticamente todas sus subcategorías activas; si es subcategoría, filtra exacto.
   - `city`: Coincidencia parcial insensible a mayúsculas sobre `locationCity`.
   - `area`: Coincidencia parcial insensible a mayúsculas sobre `locationArea` (ej. 'Fontibón', 'Suba').
@@ -377,7 +397,7 @@ Búsqueda avanzada de publicaciones con filtros combinables, resolución de jera
   - `maxQuantity`: Cantidad máxima (número positivo).
   - `unitId`: UUID de la unidad de medida (ej. kg, ton).
   - `isUrgent`: `true` \| `false` para filtrar por publicaciones urgentes.
-  - `status`: `ACTIVE` (por defecto). Si se solicita `EXPIRED` o `CLOSED`, solo es visible si el solicitante es el dueño, miembro de la organización dueña o administrador.
+  - `status`: `ACTIVE` (por defecto). Si se solicita `EXPIRED` o `CLOSED`, solo es visible para el dueño o para un miembro autorizado de la organización responsable.
   - `page`: Número de página (entero >= 1, defecto 1).
   - `pageSize`: Elementos por página (entero 1 a 50, defecto 20).
   - `sortBy`: `recent` (defecto, más recientes primero) \| `urgent_first` (urgentes primero, luego más recientes).
@@ -415,46 +435,11 @@ Búsqueda avanzada de publicaciones con filtros combinables, resolución de jera
 ## 8. Motor de Coincidencias y Sugerencias (Fase 9, RF-11, HU-08)
 
 ### `GET /api/v1/publications/:id/matches`
-Dado el ID de una publicación, calcula y devuelve candidatos activos del **TIPO OPUESTO** (`OFFER` vs. `NEED`) ordenados por puntaje de compatibilidad descendente.
+El endpoint heredado de puntuación entre publicaciones no genera coincidencias para ofertas; las sugerencias operativas se obtienen con `GET /api/v1/matches/my-suggestions`.
 
 - **Acceso**: Privado (`Authorization: Bearer <accessToken>`).
-- **Algoritmo de Scoring y Factores**:
-  - Coincidencia de subcategoría exacta: **+50 puntos**.
-  - Coincidencia de categoría principal (mismo padre): **+20 puntos**.
-  - Misma ciudad o localidad: **+20 puntos**.
-  - Cantidad compatible (oferta cubre necesidad en misma unidad): **+15 puntos**.
-  - Requerimiento urgente marcado en alguna publicación: **+10 puntos**.
-  - Publicación candidata creada en los últimos 7 días: **+5 puntos**.
-  - **Umbral de corte**: >= 40 puntos. Candidatos con menor puntaje son excluidos.
-- **Ejemplo de Respuesta (200 OK)**:
-```json
-{
-  "success": true,
-  "message": "Coincidencias obtenidas exitosamente",
-  "data": [
-    {
-      "publicationId": "9b1deb4d-...",
-      "score": 90,
-      "factors": [
-        "Misma subcategoría de material",
-        "Misma localidad o zona geográfica",
-        "Cantidad ofrecida cubre la cantidad solicitada",
-        "Publicación candidata creada en los últimos 7 días"
-      ],
-      "publication": {
-        "id": "9b1deb4d-...",
-        "type": "NEED",
-        "quantity": 300,
-        "unit": { "abbreviation": "kg" }
-      }
-    }
-  ],
-  "timestamp": "2026-10-06T18:00:00.000Z"
-}
-```
-
 ### `GET /api/v1/matches/my-suggestions`
-Devuelve las 5 mejores coincidencias para cada una de las publicaciones activas del usuario autenticado o de sus organizaciones.
+Devuelve hasta 50 ofertas activas de generadores que coinciden exactamente con las categorías seleccionadas por las organizaciones activas del usuario. Los perfiles recolectores deben tener una organización activa y categorías seleccionadas para recibir resultados.
 
 - **Acceso**: Privado (`Authorization: Bearer <accessToken>`).
 - **Ejemplo de Respuesta (200 OK)**:
@@ -464,9 +449,12 @@ Devuelve las 5 mejores coincidencias para cada una de las publicaciones activas 
   "message": "Bandeja de sugerencias obtenida exitosamente",
   "data": [
     {
-      "publicationId": "e4a7a8d2-...",
-      "publication": { ... },
-      "matches": [ ... ]
+      "id": "e4a7a8d2-...",
+      "type": "OFFER",
+      "categoryId": "770e8400-e29b-41d4-a716-446655440002",
+      "quantity": 500,
+      "category": { "name": "PET" },
+      "unit": { "abbreviation": "kg" }
     }
   ],
   "timestamp": "2026-10-06T18:00:00.000Z"
@@ -582,7 +570,178 @@ Rechaza formalmente una propuesta pendiente.
 
 ---
 
-## 10. Formato Estándar de Errores
+## 10. Módulo de Operaciones y Logística (`/api/v1/operations`) - Fase 11
+
+Implementa el ciclo de vida operativo:
+`NEGOCIACIÓN → ACEPTACIÓN → OPERACIÓN → PROGRAMACIÓN → RECOLECCIÓN → EVIDENCIA → RECEPCIÓN → CIERRE`.
+
+- **Control de estados**: `PENDING_SCHEDULE` → `SCHEDULED` → `IN_TRANSIT` → `COLLECTED` → `RECEIVED` → `COMPLETED` (o `CANCELLED`).
+- **Control de transiciones**: Se rechazan transiciones fuera de orden (`400 BAD_REQUEST: INVALID_TRANSITION`).
+- **Seguridad**: Solo participantes directos (generador o recolector) o administradores con rol `ADMIN` pueden operar o consultar.
+
+### `GET /api/v1/operations`
+Lista las operaciones en las que participa el usuario autenticado.
+
+- **Query Parameters**:
+  - `status`: Filtro por estado operativo (`PENDING_SCHEDULE`, `SCHEDULED`, `IN_TRANSIT`, `COLLECTED`, `RECEIVED`, `COMPLETED`, `CANCELLED`).
+  - `page`: Número de página (default 1).
+  - `pageSize`: Registros por página (default 20).
+- **Respuesta (200 OK)**: Lista paginada de `OperationDto`.
+
+### `POST /api/v1/operations`
+Instancia manualmente una operación a partir de una propuesta aceptada o negociación previa.
+*(Nota: Al llamar `POST /proposals/:id/accept`, el sistema instancia automáticamente la operación en estado `PENDING_SCHEDULE`)*.
+
+- **Body**:
+```json
+{
+  "proposalId": "uuid-de-propuesta",
+  "publicationId": "uuid-de-publicacion",
+  "generatorOrgId": "uuid-org-generadora-opcional",
+  "collectorOrgId": "uuid-org-recolectora-opcional",
+  "collectorUserId": "uuid-usuario-recolector",
+  "materialCategoryId": "uuid-categoria",
+  "quantity": 500.0,
+  "unitId": "uuid-unidad",
+  "notes": "Operación acordada en negociación"
+}
+```
+- **Respuesta (201 Created)**: Retorna `OperationDto` con código autogenerado `OP-BOG-YYYY-SEQ-XXXX`.
+
+### `GET /api/v1/operations/:id`
+Detalle completo de una operación, incluyendo publicación, participantes, evidencias adjuntas y evaluaciones registradas.
+
+- **Autorización**: Solo los participantes directos o administradores.
+- **Respuesta (200 OK)**: Retorna `OperationDto` con array `evidences` y `reviews`.
+
+### `PATCH /api/v1/operations/:id/schedule`
+Programa la fecha y ventana horaria de recolección en sitio.
+
+- **Transición**: De `PENDING_SCHEDULE` a `SCHEDULED`.
+- **Body**:
+```json
+{
+  "scheduledDate": "2026-10-25T14:00:00.000Z",
+  "timeWindow": "14:00 - 17:00",
+  "vehiclePlate": "ABC-123",
+  "driverName": "Carlos Mendoza",
+  "driverPhone": "+57 300 123 4567",
+  "notes": "Camión de estacas listo para carga."
+}
+```
+- **Respuesta (200 OK)**: Retorna `OperationDto` actualizado en estado `SCHEDULED`.
+
+### `PATCH /api/v1/operations/:id/collect`
+Registra el inicio de tránsito y recolección efectiva del material en el punto del generador.
+
+- **Transición**: De `SCHEDULED` a `COLLECTED` (o pasando por `IN_TRANSIT`).
+- **Respuesta (200 OK)**: Retorna `OperationDto` actualizado en estado `COLLECTED`.
+
+### `POST /api/v1/operations/:id/evidences`
+Adjunta soporte documental o fotográfico a la operación (remisión, tiquete de báscula, fotografía de acopio o manifiesto de transporte).
+
+- **Body**:
+```json
+{
+  "type": "PHOTO",
+  "fileUrl": "https://storage.datacircular.imara.org/evidences/rec-001.jpg",
+  "title": "Fotografía de material cargado en camión",
+  "notes": "500 kg de PET transparente prensado",
+  "metadata": { "geo": { "lat": 4.6789, "lng": -74.1234 } }
+}
+```
+- **Tipos de evidencia admitidos**: `PHOTO`, `WEIGHT_TICKET`, `WAYBILL`, `MANIFEST`, `OTHER`.
+- **Respuesta (201 Created)**: Retorna `OperationEvidenceDto`.
+
+### `PATCH /api/v1/operations/:id/receive`
+Registra la recepción formal del material en la planta o centro de acopio del recolector/transformador, documentando pesaje en báscula.
+
+- **Transición**: De `COLLECTED` a `RECEIVED`.
+- **Body**:
+```json
+{
+  "actualWeight": 485.5,
+  "receptionNotes": "Llegó en óptimas condiciones, merma de 14.5 kg por humedad natural.",
+  "qualityStatus": "ACCEPTED"
+}
+```
+- **Respuesta (200 OK)**: Retorna `OperationDto` con `actualWeight` registrado y estado `RECEIVED`.
+
+### `PATCH /api/v1/operations/:id/close`
+Cierre formal y definitivo del ciclo operativo.
+
+- **Transición**: De `RECEIVED` a `COMPLETED`.
+- **Body**: `{ "closingNotes": "Operación concluida a satisfacción por ambas partes." }`
+- **Respuesta (200 OK)**: Retorna `OperationDto` en estado `COMPLETED`.
+
+### `PATCH /api/v1/operations/:id/cancel`
+Cancela la operación justificando formalmente la causa.
+
+- **Restricción**: Solo puede cancelarse antes de que el estado sea `COMPLETED`.
+- **Body**: `{ "reason": "Falla mecánica insubsanable del vehículo de carga." }`
+- **Respuesta (200 OK)**: Retorna `OperationDto` en estado `CANCELLED`.
+
+### `POST /api/v1/operations/:id/reviews`
+Permite a los participantes calificar el cumplimiento, puntualidad y calidad del material de la contraparte una vez finalizada la operación (`COMPLETED`).
+
+- **Restricciones**:
+  - La operación debe estar en estado `COMPLETED` (`400 BAD_REQUEST: OPERATION_NOT_COMPLETED`).
+  - Solo el generador o el recolector pueden evaluar (`403 FORBIDDEN: NOT_OPERATION_PARTICIPANT`).
+  - Cada participante solo puede evaluar una vez por operación (`409 CONFLICT: REVIEW_ALREADY_EXISTS`).
+- **Body**:
+```json
+{
+  "score": 5,
+  "comment": "Excelente puntualidad y el material cumplió al 100% las especificaciones técnicas acordadas."
+}
+```
+- **Puntuación**: Entero del 1 al 5.
+- **Respuesta (201 Created)**: Retorna `OperationReviewDto`.
+
+---
+
+## 11. Módulo de Evaluaciones, Administración y Reportes (`/api/v1/admin`) - Fase 12
+
+Funcionalidades de control distrital, auditoría y métricas agregadas sustentadas en **datos reales de PostgreSQL** (sin indicadores ficticios ni mocks).
+- **Protección de Acceso**: Exclusivo para usuarios con rol `ADMIN` de plataforma (`requireRole('ADMIN')`, `403 FORBIDDEN` para usuarios convencionales).
+
+### `GET /api/v1/admin/kpis`
+Calcula y entrega los indicadores clave de impacto de economía circular en tiempo real sobre la base de datos de producción:
+- `tonsRecoveredTotal`: Suma de pesaje real (`actualWeight` o `quantity`) de operaciones completadas en toneladas.
+- `tonsRecoveredThisMonth`: Toneladas recuperadas dentro del mes en curso.
+- `verifiedOrganizationsCount`: Organizaciones activas en estado `VERIFIED`.
+- `activePublicationsCount`: Publicaciones de material en estado `ACTIVE`.
+- `completedOperationsCount`: Total de operaciones en estado `COMPLETED`.
+- `averageSatisfaction`: Calificación promedio nacional calculada sobre todas las evaluaciones de operaciones (`OperationReview`).
+
+- **Respuesta (200 OK)**: Retorna `CircularKpisDto`.
+
+### `GET /api/v1/admin/localities`
+Entrega el balance territorializado por ciudades y municipios de Colombia:
+- Cantidad de organizaciones activas por ciudad o municipio.
+- Publicaciones ofertadas por ciudad o municipio.
+- Toneladas totales recuperadas por ciudad o municipio.
+
+- **Respuesta (200 OK)**: Array de `LocalityMetricsDto`.
+
+### `GET /api/v1/admin/materials`
+Desglose de toneladas recuperadas y porcentaje de participación agrupado por categoría de material (Plásticos, Metales, Papel y Cartón, Vidrio, RAEE, Orgánicos, etc.).
+
+- **Respuesta (200 OK)**: Array de `MaterialSummaryDto`.
+
+### `GET /api/v1/admin/operations`
+Supervisión administrativa de todas las operaciones logísticas con filtros avanzados.
+
+- **Query Parameters**:
+  - `status`: Filtro por estado operativo (`PENDING_SCHEDULE`, `SCHEDULED`, `COLLECTED`, `RECEIVED`, `COMPLETED`, `CANCELLED`).
+  - `locality`: Filtro por ciudad o municipio.
+  - `page`: Número de página (default 1).
+  - `pageSize`: Tamaño de página (default 20).
+- **Respuesta (200 OK)**: Lista paginada de operaciones con detalles de participantes, material y evidencias.
+
+---
+
+## 12. Formato Estándar de Errores
 ```json
 {
   "success": false,
@@ -594,4 +753,3 @@ Rechaza formalmente una propuesta pendiente.
   "timestamp": "2026-09-27T18:00:00.000Z"
 }
 ```
-

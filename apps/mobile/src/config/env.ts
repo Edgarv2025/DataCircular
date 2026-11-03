@@ -61,5 +61,6 @@ export const Config = {
   apiUrl: getApiBaseUrl(),
   appName: 'DATA_CIRCULAR',
   organization: 'Fundación IMARA',
-  city: 'Bogotá D.C., Colombia',
+  city: 'Colombia',
+  coverage: 'Nacional',
 };

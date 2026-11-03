@@ -13,9 +13,16 @@ import { useRouter } from 'expo-router';
 import { Tokens } from '../../src/theme/tokens';
 import { BrandHeader } from '../../src/components/BrandHeader';
 import { ErrorBanner } from '../../src/components/ErrorBanner';
+import { navigateBackOrFallback } from '../../src/navigation';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
+  const handleBack = () =>
+    navigateBackOrFallback(
+      () => router.canGoBack(),
+      () => router.back(),
+      () => router.replace('/(auth)/login')
+    );
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -42,7 +49,7 @@ export default function ForgotPasswordScreen() {
         title="Recuperar Acceso"
         subtitle="DATA_CIRCULAR • Seguridad Institucional"
         showBack={true}
-        onBack={() => router.back()}
+        onBack={handleBack}
         curved={true}
       />
 
@@ -101,7 +108,7 @@ export default function ForgotPasswordScreen() {
 
                 <TouchableOpacity
                   style={styles.cancelLink}
-                  onPress={() => router.back()}
+                  onPress={handleBack}
                 >
                   <Text style={styles.cancelLinkText}>Cancelar y volver al login</Text>
                 </TouchableOpacity>

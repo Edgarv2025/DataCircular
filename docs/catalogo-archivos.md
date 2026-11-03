@@ -9,7 +9,7 @@ Describe cada archivo del repositorio paso a paso, su propósito, responsabilida
 
 - **Nombre del Proyecto**: DATA_CIRCULAR
 - **Organización Beneficiaria**: Fundación IMARA
-- **Ámbito Territorial**: Bogotá D.C., Colombia (20 Localidades Oficiales)
+- **Ámbito Territorial**: Colombia (Cobertura Nacional - Ciudades y Municipios)
 - **Moneda de Operación**: Peso Colombiano (COP, `$`)
 - **Marco Legal de Datos**: Ley Estatutaria 1581 de 2012 y Decreto 1377 de 2013 (Habeas Data)
 - **Arquitectura**: Monorepo con npm workspaces (`apps/api`, `apps/mobile`, `packages/shared`)
@@ -57,7 +57,7 @@ Describe cada archivo del repositorio paso a paso, su propósito, responsabilida
 - **Variables Documentadas**:
   - `PORT`: Puerto TCP del servidor HTTP (por defecto `3000`).
   - `NODE_ENV`: Entorno de ejecución (`development`, `test`, `production`).
-  - `DATABASE_URL`: Cadena de conexión PostgreSQL (`postgresql://postgres:pass@localhost:5432/data_circular_dev`).
+  - `DATABASE_URL`: Cadena de conexi?n PostgreSQL con usuario y contrase?a provistos localmente; no incluir credenciales reales en el repositorio.
   - `JWT_SECRET`: Clave simétrica para firma de Access Tokens (mínimo 32 caracteres).
   - `JWT_REFRESH_SECRET`: Clave simétrica para firma de Refresh Tokens (mínimo 32 caracteres).
   - `CORS_ORIGIN`: Orígenes autorizados separados por coma.
@@ -112,14 +112,14 @@ Describe cada archivo del repositorio paso a paso, su propósito, responsabilida
 
 ### 3.3 `packages/shared/src/index.ts`
 - **Ruta**: `/packages/shared/src/index.ts`
-- **Propósito**: Fuente única de verdad (**Single Source of Truth**) de tipos, contratos de API, enumeraciones, esquemas Zod y constantes de localización territorial para Bogotá D.C. y Colombia.
+- **Propósito**: Fuente única de verdad (**Single Source of Truth**) de tipos, contratos de API, enumeraciones, esquemas Zod y constantes de localización territorial para Colombia a nivel nacional (ciudades y municipios).
 - **Componentes y Flujo Paso a Paso**:
   1. **Constantes Territoriales**:
      - `COUNTRY_CONFIG`: Define Colombia (`CO`, `+57`, `COP`, `America/Bogota`).
-     - `BOGOTA_LOCATION`: Coordenadas centrales (`4.7110`, `-74.0721`).
-     - `BOGOTA_LOCALITIES`: Arreglo inmutable con las 20 localidades oficiales (Usaquén, Chapinero, Suba, Kennedy, Bosa, Puente Aranda, Ciudad Bolívar, etc.).
+     - `COLOMBIA_LOCATION`: Coordenadas centrales del territorio nacional.
+     - `COLOMBIA_MUNICIPALITIES` / `CITIES_AND_MUNICIPALITIES`: Arreglo inmutable con las ciudades, capitales departamentales y municipios de Colombia en orden alfabético estricto (A-Z), sin localidades distritales internas, con opción de selección o entrada manual ('Otro') para municipios lejanos u otros países.
      - `formatCOP(amount)`: Formatea valores monetarios en moneda legal colombiana.
-     - `MATERIAL_CATEGORIES_COLOMBIA`: 7 categorías según la Resolución 2184 de 2019 (Plásticos, Metales, Papel/Cartón, Vidrio, RAEE, Textiles, Orgánicos).
+     - `MATERIAL_CATEGORIES_COLOMBIA`: catálogo compacto heredado para presentación; el catálogo operativo vigente se consulta desde la API.
   2. **Contratos Base de API**:
      - `ApiResponse<T>`: Estructura estándar `{ success, message, data, error, timestamp }`.
      - `HealthCheckData`: Datos de salud de servicio y PostgreSQL.
@@ -344,7 +344,7 @@ Describe cada archivo del repositorio paso a paso, su propósito, responsabilida
 ### 6.5 Módulo de Catálogo de Materiales y Unidades (`modules/catalog/`) — Fase 8
 - **Archivos**:
   - `catalog.seed.ts`:
-    - Sembrador de 6 unidades de medida (`kg`, `ton`, `und`, `l`, `m3`, `bulto`) y 9 categorías maestras con sus 39 subcategorías hoja del mercado colombiano de reciclaje.
+    - Sembrador idempotente de 6 unidades de medida y 11 categorías maestras con 77 subcategorías (75 activas y 2 inactivas por revisión jurídica). Las subcategorías heredadas que ya no pertenecen al catálogo se conservan inactivas para proteger referencias históricas.
   - `catalog.repository.ts`:
     - Capa de acceso a datos Prisma para listar el árbol jerárquico de categorías, consultar por ID o nombre, y CRUD de unidades de medida.
   - `catalog.service.ts`:
@@ -401,12 +401,44 @@ Describe cada archivo del repositorio paso a paso, su propósito, responsabilida
   - `conversations.routes.ts`:
     - Enrutadores Express `conversationsRouter` y `proposalsRouter` protegidos con `authenticateToken`.
 
-### 6.9 Módulo Dashboard (`modules/dashboard/`)
+### 6.9 Módulo de Operaciones y Logística (`modules/operations/`) — Fase 11 (RF-14, RF-15, HU-09)
+- **Archivos**:
+  - `operations.repository.ts`:
+    - Persistencia en PostgreSQL para el ciclo de vida completo de la operación.
+    - Generación atómica de códigos únicos `OP-BOG-YYYY-SEQ-XXXX`.
+    - Registro de programación (`schedule`), recolección (`collect`), recepción con báscula (`receive`), cierre (`close`), cancelación (`cancel`), evidencias (`addEvidence`) y evaluaciones (`addReview`).
+    - DTOs sanitizados `toOperationDto`, `toEvidenceDto` y `toReviewDto`.
+  - `operations.service.ts`:
+    - Máquina de estados finitos estricta:
+      `PENDING_SCHEDULE → SCHEDULED → IN_TRANSIT → COLLECTED → RECEIVED → COMPLETED` (o `CANCELLED`).
+    - Control de transiciones: rechaza transiciones inválidas con `400 BAD_REQUEST: INVALID_TRANSITION`.
+    - Control de acceso: solo participantes directos o administradores pueden interactuar con la operación.
+    - Regla de evaluación: solo se permite evaluar operaciones en estado `COMPLETED` y una única vez por participante.
+  - `operations.controller.ts` y `operations.routes.ts`:
+    - Endpoints REST montados en `/api/v1/operations`: listado (`GET /`), detalle (`GET /:id`), creación (`POST /`), programación (`PATCH /:id/schedule`), recolección (`PATCH /:id/collect`), evidencias (`POST /:id/evidences`), recepción (`PATCH /:id/receive`), cierre (`PATCH /:id/close`), cancelación (`PATCH /:id/cancel`) y evaluaciones (`POST /:id/reviews`).
+
+### 6.10 Módulo de Evaluaciones, Administración y Reportes (`modules/admin/`) — Fase 12
+- **Archivos**:
+  - `admin.repository.ts`:
+    - Consultas agregadas sobre **datos reales de PostgreSQL** (sin indicadores ficticios ni mocks).
+    - Agregación de pesaje real (`actualWeight` o `quantity`) de operaciones completadas para toneladas recuperadas totales y del mes.
+    - Conteo de organizaciones verificadas, publicaciones activas y operaciones cerradas.
+    - Cálculo de calificación de satisfacción promedio distrital a partir de `operation_reviews`.
+    - Distribución territorial por ciudades y municipios de Colombia.
+    - Desglose de materiales recuperados por categoría.
+    - Supervisión administrativa paginada de todas las operaciones logísticas.
+  - `admin.service.ts`:
+    - Lógica de negocio y empaquetado de DTOs (`CircularKpisDto`, `LocalityMetricsDto`, `MaterialSummaryDto`).
+  - `admin.controller.ts` y `admin.routes.ts`:
+    - Endpoints REST montados en `/api/v1/admin`: KPIs circulares (`GET /kpis`), localidades (`GET /localities`), materiales (`GET /materials`) y supervisión de operaciones (`GET /operations`).
+    - Protegidos con `authenticateToken` y `requireRole('ADMIN')`.
+
+### 6.11 Módulo Dashboard (`modules/dashboard/`)
 - **Archivos**: `dashboard.routes.ts`
 - **Propósito**: Consola web servida en la raíz `GET /` con interfaz HTML interactiva para pruebas manuales rápidas de salud, registro y login desde el navegador.
 
-### 6.10 Enrutamiento Principal y Servidor
-- **`apps/api/src/routes/v1.routes.ts`**: Enrutador central que monta `/health`, `/auth`, `/users`, `/organizations`, `/catalog`, `/publications`, `/matches`, `/conversations` y `/proposals` bajo el prefijo común `/api/v1`.
+### 6.12 Enrutamiento Principal y Servidor
+- **`apps/api/src/routes/v1.routes.ts`**: Enrutador central que monta `/health`, `/auth`, `/users`, `/organizations`, `/catalog`, `/publications`, `/matches`, `/conversations`, `/proposals`, `/operations` y `/admin` bajo el prefijo común `/api/v1`.
 - **`apps/api/src/app.ts`**: Fábrica de la aplicación Express (`createApp`) configurando Helmet, CORS dinámico, parsers JSON y middlewares de error.
 - **`apps/api/src/server.ts`**: Punto de entrada del proceso. Conecta a PostgreSQL, arranca el servidor HTTP en el puerto configurado y registra manejadores para Graceful Shutdown (`SIGTERM`, `SIGINT`).
 
@@ -414,7 +446,7 @@ Describe cada archivo del repositorio paso a paso, su propósito, responsabilida
 
 ## 7. Backend API — Suites de Pruebas Automatizadas (`apps/api/tests/`)
 
-- **Tecnología**: Vitest + Supertest (110 pruebas automatizadas, 100% pasando).
+- **Tecnología**: Vitest + Supertest (143 pruebas automatizadas en 10 suites, 100% pasando).
 1. `tests/health.test.ts` (2 tests):
    - Verifica respuesta 200 en `/api/v1/health` con conectividad a PostgreSQL.
    - Verifica respuesta 404 en rutas inexistentes.
@@ -449,7 +481,7 @@ Describe cada archivo del repositorio paso a paso, su propósito, responsabilida
    - Flujo de solicitud de verificación institucional y dictamen administrativo por parte de `ADMIN`.
    - Desactivación lógica de la organización (`Soft Delete`).
 6. `tests/catalog-and-publications.test.ts` (16 tests):
-   - Verificación de catálogo sembrado (9 categorías principales y 39 subcategorías).
+   - Verificación de las 11 categorías, 75 subcategorías activas y 2 subcategorías inactivas por revisión jurídica.
    - Verificación de unidades mínimas (kg, ton, und, l, m3, bulto).
    - Jerarquía de categorías (rechazo de subcategoría si `parentId` no existe).
    - Rechazo de publicación sobre categoría principal (400 Bad Request).
@@ -463,7 +495,7 @@ Describe cada archivo del repositorio paso a paso, su propósito, responsabilida
    - Búsqueda sin filtros con paginación obligatoria y solo publicaciones `ACTIVE`.
    - Filtro jerárquico por categoría padre que incluye automáticamente sus subcategorías.
    - Filtro por subcategoría exacta de material.
-   - Filtros combinados de tipo (`OFFER`), ciudad, localidad (`locationArea`) y rango de cantidad.
+   - Filtros combinados de tipo (`OFFER`), ciudad, municipio (`locationArea`) y rango de cantidad.
    - Ordenamiento prioritario por publicaciones urgentes (`sortBy=urgent_first`).
    - Reglas de visibilidad para publicaciones `EXPIRED` (ocultas a terceros, visibles para el dueño).
    - Identificación de candidatos opuestos (`OFFER` vs. `NEED`) que superan el umbral ($\ge 40$ puntos).
@@ -492,6 +524,47 @@ Describe cada archivo del repositorio paso a paso, su propósito, responsabilida
    - Aceptación formal de propuesta por la contraparte (200 OK, `ACCEPTED`).
    - Control de concurrencia ante doble respuesta (409 Conflict).
    - Cierre de negociación: bloqueo de nuevas propuestas tras aceptación (409 Conflict).
+9. `tests/operations-flow.test.ts` (17 tests) — Fase 11:
+   - Creación automática de operación en estado `PENDING_SCHEDULE` al aceptar una propuesta.
+   - Creación manual de operación vía `POST /api/v1/operations`.
+   - Consulta paginada y filtrado por estado de operaciones.
+   - Consulta detallada con relaciones y validación de autorización (bloqueo a terceros no participantes con 403).
+   - Programación de fecha, franja y datos de transporte (`PATCH /schedule`).
+   - Rechazo de transiciones inválidas fuera de orden (ej. intentar cerrar o recibir sin programar/recolectar con 400).
+   - Registro de recolección en sitio (`PATCH /collect`).
+   - Adjuntar evidencias fotográficas y documentales (`POST /evidences`).
+   - Validación de esquema de evidencia (rechazo de URL inválida con 400).
+   - Recepción en planta con pesaje de báscula (`PATCH /receive`).
+   - Cierre formal de la operación (`PATCH /close`) culminando en estado `COMPLETED`.
+   - Bloqueo de mutaciones posteriores sobre operaciones cerradas.
+   - Flujo de cancelación formal justificada (`PATCH /cancel`).
+   - Bloqueo de cancelación sobre operaciones finalizadas (`COMPLETED`).
+10. `tests/evaluations-and-reports.test.ts` (11 tests) — Fase 12:
+    - Evaluación y calificación de operación completada (`POST /operations/:id/reviews`).
+    - Rechazo de evaluación si la operación no está en estado `COMPLETED` (400).
+    - Bloqueo de evaluación por usuarios no participantes (403).
+    - Prevención de duplicación de evaluación por el mismo usuario (409 Conflict).
+    - Protección de rutas administrativas `/api/v1/admin/*`: rechazo con 403 Forbidden a usuarios normales (`USER`).
+    - Acceso exclusivo para administradores (`ADMIN`).
+    - Indicadores circulares en tiempo real sustentados en datos reales de PostgreSQL (`GET /admin/kpis`).
+    - Métricas territoriales por ciudades y municipios de Colombia (`GET /admin/localities`).
+    - Balance de materiales recuperados por categoría (`GET /admin/materials`).
+    - Supervisión administrativa con filtrado territorial (`GET /admin/operations`).
+11. `tests/legal-and-parameters.test.ts` (15 tests) — Sistema Legal, Tarifas Editables y Verificación Documental:
+    - Verificación de metadatos del catálogo oficial `LEGAL_CONTENT_ES` (`version: '2026.1.0'`, `estado: BORRADOR - PENDIENTE DE REVISIÓN JURÍDICA`).
+    - Consistencia y presencia de los 6 textos normativos oficiales sin texto quemado en pantallas.
+    - Generador del texto del badge de usuario verificado con fecha dinámica.
+    - Generador del texto de revocación con fecha dinámica.
+    - Helper de auditoría de vistas legales con captura de versión mostrada.
+    - Contraste WCAG AA para tokens oficiales (`brand.orange = #FA6060`, texto verde oscuro `#102A1C`, `brand.orangeStrong = #C2570C`).
+    - Parámetros de tarifas de verificación (`VerificationFee`) por tipo (`SELF` / `OTHER`) con valor `null` por defecto.
+    - Validación del aviso de tarifa pendiente cuando el valor es `null`.
+    - Registro inmutable de auditoría (`AuditLog`) ante cambios de tarifa con motivo obligatorio.
+    - Restricción de permisos para modificación de tarifas (`platform:settings`).
+    - Instantánea de tarifa (`feeSnapshot`) al radicar solicitudes para garantizar inmutabilidad retroactiva.
+    - Ajuste manual administrativo de tarifas por solicitud específica con registro de auditoría.
+    - Emisión y consulta pública de constancias de verificación por código criptográfico.
+    - Renderizado condicional de leyendas de borrador e indicación de revocación de constancias.
 
 ---
 
@@ -542,7 +615,7 @@ Describe cada archivo del repositorio paso a paso, su propósito, responsabilida
 - **`Input.tsx`**: Campo de formulario con etiqueta flotante, mensajes de error, botón de alternar visibilidad de contraseña (Ver/Ocultar) y soporte para prefijo telefónico.
 - **`Card.tsx`**: Contenedor de superficie con bordes redondeados y sombra para organización visual.
 - **`ErrorBanner.tsx`**: Banner de alertas para mensajes de error, éxito, advertencia o información.
-- **`LocalityPicker.tsx`**: Selector modal con las 20 localidades oficiales de Bogotá D.C. importadas directamente de `@data-circular/shared`.
+- **`LocalityPicker.tsx`**: Selector modal de ciudad o municipio con búsqueda integrada y datos de ciudades/municipios importados directamente de `@data-circular/shared`.
 
 ### 8.4 Sistema de Diseño y Tokens Centralizados (`apps/mobile/src/theme/`)
 - **`src/theme/tokens.ts`**: Tokens centralizados extraídos directamente de la maqueta (`maqueta.jpg`):
@@ -560,53 +633,65 @@ Describe cada archivo del repositorio paso a paso, su propósito, responsabilida
 - **`src/api/publications.api.ts`**: Operaciones de publicaciones (`search`, `getById`, `create`, `update`, `close`, `getMine`).
 - **`src/api/matches.api.ts`**: Consulta de coincidencias por publicación (`getMatches`) y bandeja de sugerencias (`getMySuggestions`).
 - **`src/api/organizations.api.ts`**: Gestión de organizaciones, membresías, dictamen y radicación de certificación (`getMyOrganizations`, `getAllOrganizations`, `create`, `update`, `requestVerification`, `reviewVerification`, `getMembers`, `addMember`).
+- **`src/api/operations.api.ts`**: Gestión del ciclo de vida operativo (`getOperations`, `getOperationById`, `schedule`, `collect`, `addEvidence`, `receive`, `close`, `cancel`, `createReview`) (Fase 11).
+- **`src/api/admin.api.ts`**: Métodos administrativos e indicadores distritales (`getCircularKpis`, `getLocalityMetrics`, `getMaterialSummaries`, `getSupervisionOperations`) (Fase 12).
 
 ### 8.6 Capa de Mocks y Control de Características (`apps/mobile/src/mocks/` y `config/`)
-- **`src/config/features.ts`**: Banderas de activación desacopladas (`USE_MOCKS_CHAT`, `USE_MOCKS_PROPOSALS`, `USE_MOCKS_OPERATIONS`, `USE_MOCKS_ADMIN_MODERATION`).
+- **`src/config/features.ts`**: Banderas de activación desacopladas (`USE_MOCKS_CHAT`, `USE_MOCKS_PROPOSALS`, `USE_MOCKS_OPERATIONS: false`, `USE_MOCKS_ADMIN_MODERATION: false`). Las operaciones y administración distrital operan directamente contra la API REST real de backend.
 - **`src/mocks/chat.mock.ts`**: Conversaciones simuladas y mensajes hilos para negociación circular (Fase 10).
 - **`src/mocks/proposals.mock.ts`**: Propuestas comerciales en pesos COP y puntos de entrega en Bogotá D.C. (Fase 11).
-- **`src/mocks/operations.mock.ts`**: Operaciones con trazabilidad de 5 etapas (Agendada, Pesaje, Evidencia, Recepción, Cierre) (Fase 12).
-- **`src/mocks/moderation.mock.ts`**: Indicadores agregados de impacto ambiental y reportes de moderación (Fase 13).
+- **`src/mocks/operations.mock.ts`**: Estructuras mock de referencia histórica.
+- **`src/mocks/moderation.mock.ts`**: Reportes de moderación de referencia histórica.
 
 ### 8.7 Componentes Reutilizables de Interfaz (`apps/mobile/src/components/`)
 - **`src/components/BrandHeader.tsx`**: Cabecera institucional curva en verde bosque oscuro (`#1F4D36`) con título DATA_CIRCULAR, subtítulo de Fundación IMARA, soporte para botón atrás y slot de acciones derechas.
 - **`src/components/CircularSeal.tsx`**: Sellos circulares emblemáticos de sostenibilidad e impacto positivo observables en la base del login (Sostenibilidad, Reciclaje Circular, Impacto Positivo).
 - **`src/components/CategoryChip.tsx`**: Chip en squircle verde salvia (`#E4EEE4`) con íconos temáticos según tipo de material y etiqueta inferior legible.
-- **`src/components/MaterialCard.tsx`**: Tarjeta en cuadrícula de 2 columnas con imagen o fallback temático, badges de tipo y urgencia, cantidad/unidad técnica, pin de localidad de Bogotá y botón verde *"Ver detalle"*.
+- **`src/components/MaterialCard.tsx`**: Tarjeta en cuadrícula de 2 columnas con imagen o fallback temático, badges de tipo y urgencia, cantidad/unidad técnica, pin de ciudad o municipio y botón verde *"Ver detalle"*.
 - **`src/components/MatchCard.tsx`**: Tarjeta de coincidencia inteligente (Fase 9 / HU-08) con badge de compatibilidad porcentual y desglose auditable de factores.
-- **`src/components/FilterModal.tsx`**: Modal deslizante de filtros avanzados (tipo, categoría, localidad distrital, cantidad mínima/máxima, unidad, urgencia y ordenamiento).
+- **`src/components/FilterModal.tsx`**: Modal deslizante de filtros avanzados (tipo, categoría, ciudad o municipio, cantidad mínima/máxima, unidad, urgencia y ordenamiento).
 - **`src/components/BottomTabBar.tsx`**: Barra de navegación inferior con 5 elementos: Inicio, Publicar, botón flotante central (+) elevado con sombra, Chat con contador de mensajes no leídos, y Perfil.
 - **`src/components/MockBanner.tsx`**: Indicador discreto obligatorio para vistas o secciones que operan con datos simulados.
-- **`src/components/LocalityPicker.tsx`**: Selector modal de las 20 localidades oficiales de Bogotá D.C.
+- **`src/components/LocalityPicker.tsx`**: Selector modal de ciudades y municipios de Colombia.
 - **`src/components/Button.tsx`**, **`Input.tsx`**, **`Card.tsx`**, **`ErrorBanner.tsx`**: Componentes base accesibles.
+- **`src/components/LegalNoticeModal.tsx`**: Modal normativo para el Aviso Legal Completo (Punto 1 del Anexo) consumido exclusivamente desde `LEGAL_CONTENT_ES`.
+- **`src/components/CompactLegalNotice.tsx`**: Componente de tarjeta de listado para el Aviso Compacto (Punto 2 del Anexo: *"Información declarada por el usuario"* + ícono que abre el aviso completo).
+- **`src/components/VerifiedUserBadge.tsx`**: Badge interactivo de Usuario Verificado (Punto 4 del Anexo) con modal informativo y fecha dinámica de validación documental.
+- **`src/components/VerificationRequestModal.tsx`**: Formulario oficial de solicitud de verificación (Punto 3 del Anexo: soporte para auto-verificación u organizaciones terceras, aviso de tarifa dinámica o mensaje de costo pendiente, casillas obligatorias y política de datos).
+- **`src/components/VerificationCertificateModal.tsx`**: Visualizador oficial de la Constancia de Verificación Documental (Puntos 5 y 6 del Anexo: expedido por Fundación IMARA, soporte para URL/QR público, marca de borrador legal condicional y banner de revocación si aplica).
 
 ### 8.8 Pantallas y Flujos de Navegación (`apps/mobile/app/`)
-- **`app/_layout.tsx`**: Enrutador raíz con inicialización de contexto y SafeArea.
+- **`app/_layout.tsx`**: Enrutador raíz con inicialización de contexto, SafeArea y ruta pública `/verify/[code]`.
 - **`app/index.tsx`**: Pantalla inicial de bienvenida distrital y presentación institucional.
+- **`app/verify/[code].tsx`**: Pantalla pública de consulta de validez de constancia de verificación documental accesible mediante escaneo de código QR o enlace web directo.
 - **`app/(auth)/_layout.tsx`**: Layout del grupo de autenticación sin cabeceras nativas duplicadas.
 - **`app/(auth)/login.tsx`**: Pantalla de acceso rediseñada fielmente a `maqueta.jpg`: cabecera curva verde bosque, campos en verde bosque oscuro con íconos, botón de acción verde y sellos circulares de sostenibilidad en la base.
-- **`app/(auth)/register.tsx`**: Formulario de registro con tipología de actor, consentimiento expreso de política de datos (Ley 1581) y selección de localidad.
+- **`app/(auth)/register.tsx`**: Formulario de registro con tipología de actor, consentimiento expreso de política de datos (Ley 1581) y selección de ciudad o municipio.
 - **`app/(auth)/forgot-password.tsx`**: Flujo de recuperación de contraseña institucional.
 - **`app/(app)/_layout.tsx`**: Layout autenticado con enrutamiento stack unificado y protección de rutas privadas.
 - **`app/(app)/index.tsx` (Inicio / Marketplace)**: Pantalla principal fiel a la maqueta con buscador integrado, carrusel horizontal de categorías, selector de Ofertas/Necesidades, sugerencias de coincidencias y cuadrícula de 2 columnas.
 - **`app/(app)/publish.tsx` (Publicar Materiales)**: Formulario de creación de oferta/demanda con catálogo jerárquico real y subpestaña de gestión de publicaciones propias ("Mis Publicaciones").
-- **`app/(app)/publication/[id].tsx` (Detalle de Publicación)**: Visualizador completo de material con especificaciones técnicas, información de actor verificado, contador de compatibles, desglose de matches y botón de contacto.
+- **`app/(app)/publication/[id].tsx` (Detalle de Publicación)**: Visualizador completo de material con especificaciones técnicas, información de actor verificado (`VerifiedUserBadge`), aviso legal completo con botón *"Solicitar verificación"* y visualizador de constancia.
 - **`app/(app)/chat.tsx` (Negociación y Mensajería)**: Centro de interacción segmentado en Mensajes directos, Propuestas comerciales circulares y Operaciones de trazabilidad.
-- **`app/(app)/profile.tsx` (Mi Perfil)**: Datos personales del usuario, gestión real de organizaciones vinculadas (Fase 7), solicitud de certificación institucional, edición y cierre de sesión.
+- **`app/(app)/profile.tsx` (Mi Perfil)**: Datos personales del usuario, gestión de organizaciones, badge y certificado institucional, radicación de solicitudes de verificación y listado de *"Mis Solicitudes"*.
 - **`app/(app)/edit-profile.tsx`**: Edición de datos personales con persistencia real en PostgreSQL.
 - **`app/(app)/users.tsx`**: Panel de gestión de usuarios de plataforma para administradores.
-- **`app/(app)/admin.tsx`**: Panel de control distrital con dictamen de verificaciones institucionales (API real Fase 7), auditoría del catálogo de materiales e indicadores de impacto.
+- **`app/(app)/admin.tsx`**: Panel de control distrital con 5 pestañas: Dictamen de Organizaciones, Auditoría de Catálogo, Balance de Materiales, Operaciones e Indicadores, y **⚙️ Parámetros** (gestión de tarifas `SELF`/`OTHER`, trazabilidad en `AuditLog`, y ajuste manual de tarifas por solicitud con justificación obligatoria).
 
 ---
 
 ## 9. Documentación Técnica de Soporte (`docs/`)
 
+- **`docs/manual-usuario.md`**: Manual Exhaustivo de Usuario Final para Generadores, Recicladores, Transportadores y Transformadores (flujo de pantallas, campos, validaciones y preguntas frecuentes).
+- **`docs/manual-administrador.md`**: Manual de Operación y Gobernanza para el Administrador de Plataforma (auditoría de organizaciones, catálogo, balance de masa, KPIs distritales y control de usuarios).
+- **`docs/guia-pruebas-y-flujo.md`**: Guía de Verificación, Pruebas Automatizadas y Flujo del Proyecto (diagrama de secuencia, matriz de casos de prueba y comandos de testing).
 - **`docs/arquitectura.md`**: Diagramas y descripción de la arquitectura Clean Architecture, patrón de monorepo y separación en capas.
 - **`docs/modelo-datos.md`**: Especificación completa del modelo relacional, tablas de PostgreSQL, campos, restricciones de integridad, índices y catálogo de migraciones.
-- **`docs/api.md`**: Especificación de la API REST para los endpoints `/health`, `/auth`, `/users` y `/organizations`.
+- **`docs/api.md`**: Especificación de la API REST para los endpoints `/health`, `/auth`, `/users`, `/organizations`, `/catalog`, `/publications`, `/conversations`, `/operations` y `/admin`.
 - **`docs/seguridad.md`**: Matriz de controles de seguridad (Argon2id, JWT, Rate Limiting, OWASP Top 10, Anti-enumeración, Validación con Zod, Protección de Propietario).
 - **`docs/decisiones-tecnicas.md`**: Registro de Decisiones de Arquitectura (ADR-001 al ADR-006).
 - **`docs/plan-pruebas.md`**: Estrategia de testing, cobertura unitaria, de integración y E2E.
+- **`docs/ui-contracts.md`**: Contratos de Interfaz de Usuario y fidelidad a la maqueta visual distrital.
 - **`docs/ejecucion-local.md`**: Guía paso a paso para levantar el proyecto en Windows con PostgreSQL y Expo Go.
 
 ---
@@ -629,4 +714,4 @@ Describe cada archivo del repositorio paso a paso, su propósito, responsabilida
    - Regla inviolable: No es posible degradar ni remover al único `OWNER` de una organización activa.
    - Borrado lógico (`Soft Delete`) mediante marcas temporales `deletedAt` para trazabilidad de operaciones de economía circular.
 6. **Localización Territorial y Legal**:
-   - Integración nativa del contexto de Bogotá D.C. (20 localidades, moneda COP, Ley 1581 de 2012 de Habeas Data).
+   - Integración nativa del contexto de Colombia a nivel nacional (ciudades y municipios, moneda COP, Ley 1581 de 2012 de Habeas Data).
