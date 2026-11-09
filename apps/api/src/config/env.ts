@@ -16,9 +16,24 @@ const envSchema = z.object({
   JWT_EXPIRES_IN: z.string().default('7d'),
   JWT_REFRESH_SECRET: z.string().min(16).default(defaultJwtRefreshSecret),
   JWT_REFRESH_EXPIRES_IN: z.string().default('30d'),
-  CORS_ORIGIN: z.string().default('*'),
+  CORS_ORIGIN: z.preprocess(
+    (value) => value === undefined && process.env.RENDER_EXTERNAL_URL
+      ? process.env.RENDER_EXTERNAL_URL
+      : value,
+    z.string().default('*')
+  ),
   DATA_POLICY_URL: z.preprocess(
-    (value) => value === '' || value === 'https://fundacionimara.org/politica-datos-pendiente' ? undefined : value,
+    (value) => {
+      if (
+        value === undefined ||
+        value === '' ||
+        value === 'https://fundacionimara.org/politica-datos-pendiente'
+      ) {
+        const externalUrl = process.env.RENDER_EXTERNAL_URL;
+        return externalUrl ? `${externalUrl.replace(/\/$/, '')}/politica-datos` : undefined;
+      }
+      return value;
+    },
     z.string().url('DATA_POLICY_URL debe ser una URL válida').optional()
   ),
   DATA_POLICY_VERSION: z.preprocess(
@@ -34,6 +49,12 @@ const envSchema = z.object({
       path: ['JWT_SECRET'],
       message: 'JWT_SECRET debe configurarse con un secreto propio en producción',
     });
+  } else if (Buffer.byteLength(config.JWT_SECRET, 'utf8') < 32) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['JWT_SECRET'],
+      message: 'JWT_SECRET debe tener al menos 32 bytes en producción',
+    });
   }
 
   if (config.JWT_REFRESH_SECRET === defaultJwtRefreshSecret) {
@@ -41,6 +62,64 @@ const envSchema = z.object({
       code: z.ZodIssueCode.custom,
       path: ['JWT_REFRESH_SECRET'],
       message: 'JWT_REFRESH_SECRET debe configurarse con un secreto propio en producción',
+    });
+  } else if (Buffer.byteLength(config.JWT_REFRESH_SECRET, 'utf8') < 32) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['JWT_REFRESH_SECRET'],
+      message: 'JWT_REFRESH_SECRET debe tener al menos 32 bytes en producción',
+    });
+  }
+
+  if (config.JWT_SECRET === config.JWT_REFRESH_SECRET) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['JWT_REFRESH_SECRET'],
+      message: 'JWT_REFRESH_SECRET debe ser distinto de JWT_SECRET',
+    });
+  }
+
+  const corsOrigins = config.CORS_ORIGIN.split(',').map((origin) => origin.trim());
+  const hasInvalidCorsOrigin = corsOrigins.some((origin) => {
+    if (!origin || origin === '*') return true;
+
+    try {
+      const parsedOrigin = new URL(origin);
+      return (
+        parsedOrigin.protocol !== 'https:' ||
+        parsedOrigin.pathname !== '/' ||
+        parsedOrigin.search.length > 0 ||
+        parsedOrigin.hash.length > 0
+      );
+    } catch {
+      return true;
+    }
+  });
+
+  if (hasInvalidCorsOrigin) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['CORS_ORIGIN'],
+      message: 'CORS_ORIGIN debe contener únicamente orígenes HTTPS válidos y autorizados en producción',
+    });
+  }
+
+  if (!config.DATA_POLICY_URL || !config.DATA_POLICY_URL.startsWith('https://')) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['DATA_POLICY_URL'],
+      message: 'DATA_POLICY_URL debe ser una URL HTTPS pública en producción',
+    });
+  }
+
+  if (
+    config.DATA_POLICY_VERSION.trim().toLowerCase() === 'pendiente' ||
+    config.DATA_POLICY_VERSION.trim().toLowerCase().includes('draft')
+  ) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['DATA_POLICY_VERSION'],
+      message: 'DATA_POLICY_VERSION debe identificar la versión publicada de la política',
     });
   }
 });

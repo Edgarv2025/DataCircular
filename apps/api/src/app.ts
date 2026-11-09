@@ -7,6 +7,7 @@ import { errorHandler } from './middleware/errorHandler';
 import { notFoundHandler } from './middleware/notFoundHandler';
 import { telemetryMiddleware } from './middleware/telemetry.middleware';
 import { env } from './config/env';
+import { privacyPolicyRouter } from './modules/legal/privacy-policy.routes';
 
 export function createApp(): Application {
   const app: Application = express();
@@ -46,6 +47,7 @@ export function createApp(): Application {
   app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
   // Consola Interactiva para pruebas visuales en navegador
+  app.use('/', privacyPolicyRouter);
   app.use('/', dashboardRouter);
 
   // Rutas versionadas de la API

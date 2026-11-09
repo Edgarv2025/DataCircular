@@ -286,7 +286,7 @@ export default function RegisterScreen() {
 
             <View style={styles.habeasDataBox}>
               <Text style={styles.habeasDataText}>
-                Fundación IMARA informa que cuenta con una política institucional de tratamiento de datos personales conforme a la Ley 1581 de 2012.
+                La política disponible para este entorno es un borrador y no debe usarse con datos reales. Fundación IMARA debe revisarla y aprobarla antes de habilitar registros de producción.
               </Text>
               {dataPolicyInfo?.url ? (
                 <TouchableOpacity

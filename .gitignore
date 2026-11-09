@@ -30,6 +30,9 @@ web-build/
 .env.development.local
 .env.test.local
 .env.production.local
+.env.test*
+test-credentials.json
+/apps/mobile/google-service-account.json
 
 # Bases de datos y almacenamiento local
 *.sqlite
